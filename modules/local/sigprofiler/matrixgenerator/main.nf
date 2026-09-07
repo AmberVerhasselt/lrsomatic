@@ -6,7 +6,7 @@ process SIGPROFILER_MATRIXGENERATOR {
     // that adds the CHM13-T2T genome (SigProfilerSuite/SigProfilerMatrixGenerator#250) and
     // SigProfilerAssignment from the fork that adds CHM13-T2T COSMIC signatures. Return to
     // the bioconda/biocontainers releases once both are merged and released upstream.
-    container "${workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer'
+    container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
         ? 'oras://ghcr.io/ljwharbers/sigprofiler-sif:1.3.6-chm13-28a9ce8'
         : 'ghcr.io/ljwharbers/sigprofiler:1.3.6-chm13-28a9ce8'}"
 

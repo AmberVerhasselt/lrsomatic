@@ -44,7 +44,7 @@ workflow PREPARE_SIGNATURES {
             if (n_chrom < 24) {
                 error("${tsb_dir} holds ${n_chrom} chromosome files; a complete SigProfilerMatrixGenerator install of ${genome} has 24 (1-22, X, Y).")
             }
-            sigprofiler_volume = channel.fromPath(genome_dir, type: 'dir', checkIfExists: true).collect()
+            sigprofiler_volume = channel.value(file(genome_dir, type: 'dir', checkIfExists: true))
         }
         // sigprofiler_volume: path -- SigProfilerMatrixGenerator volume root (downloaded or validated local)
 
