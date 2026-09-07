@@ -12,7 +12,9 @@ process SIGPROFILER_MATRIXGENERATOR {
 
     input:
     tuple val(meta), path(vcf)          // somatic small-variant VCF (plain or bgzipped)
-    tuple val(meta2), path(volume)      // SigProfilerMatrixGenerator volume containing tsb/<genome>/
+    // Staged under a fixed name: the script builds its own local `volume/`, and the directory
+    // produced by SIGPROFILER_INSTALL (and the published cache) is itself called `volume`.
+    tuple val(meta2), path(volume, stageAs: 'genome_volume')      // SigProfilerMatrixGenerator volume containing tsb/<genome>/
     val(genome)                         // SigProfilerMatrixGenerator genome name, e.g. GRCh38 or CHM13-T2T
 
     output:
