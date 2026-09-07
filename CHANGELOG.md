@@ -5,6 +5,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v1.2.0dev
 
+### `Added`
+
+- [#185](https://github.com/IntGenomicsLab/lrsomatic/pull/185) - Added optional VEP plugins for AlphaMissense, SIFT/PolyPhen, ClinVar, CADD, REVEL and EVE on GRCh38, and AlphaMissense plus SIFT/PolyPhen on CHM13 via protein-space lookup. All are off unless their data file is supplied; nothing is redistributed by the pipeline (@AmberVerhasselt).
+
 ### `Changed`
 
 - [#184](https://github.com/IntGenomicsLab/lrsomatic/pull/184) - Replaced the CHM13 Severus panel of normals with the merged 1000 Genomes + ASAP panel (@AmberVerhasselt).

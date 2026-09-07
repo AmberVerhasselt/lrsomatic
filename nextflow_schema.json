@@ -215,6 +215,95 @@
                 },
                 "vep_custom_tbi": {
                     "type": "string"
+                },
+                "vep_alphamissense": {
+                    "type": "string",
+                    "description": "Path or URL to the AlphaMissense GRCh38 score file for the AlphaMissense plugin.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "AlphaMissense_hg38.tsv.gz from https://storage.googleapis.com/dm_alphamissense, indexed with `tabix -s 1 -b 2 -e 2 -f -S 1`. GRCh38 only; use --vep_alphamissense_aa for CHM13. Licensed CC BY 4.0."
+                },
+                "vep_alphamissense_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_alphamissense.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_alphamissense_aa": {
+                    "type": "string",
+                    "description": "Path or URL to a protein-space AlphaMissense table for the AlphaMissenseProtein plugin (CHM13).",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "Built from AlphaMissense_aa_substitutions.tsv.gz with bin/build_alphamissense_protein_table.sh. Keyed on gene symbol and amino-acid substitution, so it is assembly-independent and is the route to AlphaMissense scores on CHM13."
+                },
+                "vep_alphamissense_aa_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_alphamissense_aa.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_polyphen_sift_db": {
+                    "type": "string",
+                    "description": "Path or URL to the Ensembl pangenome PolyPhen/SIFT SQLite database for the PolyPhen_SIFT plugin (CHM13).",
+                    "fa_icon": "fas fa-database",
+                    "help_text": "homo_sapiens_pangenome_PolyPhen_SIFT_20240502.db (12 GB) from https://ftp.ensembl.org/pub/current_variation/pangenomes/Human/. Keyed on the MD5 of the peptide sequence, which is why it works on CHM13. On GRCh38 SIFT and PolyPhen come from the cache instead and this is not needed."
+                },
+                "vep_clinvar": {
+                    "type": "string",
+                    "description": "Path or URL to a ClinVar VCF, added as a VEP --custom annotation.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "GRCh38: https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz. CHM13: the CHM13-lifted VCF under https://ftp.ensembl.org/pub/rapid-release/species/Homo_sapiens/GCA_009914755.4/ensembl/variation/. Check that contig naming matches your reference."
+                },
+                "vep_clinvar_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_clinvar.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_clinvar_fields": {
+                    "type": "string",
+                    "description": "Comma-separated ClinVar INFO fields to carry into the annotation.",
+                    "fa_icon": "fas fa-list",
+                    "default": "CLNSIG,CLNREVSTAT,CLNDN"
+                },
+                "vep_cadd_snv": {
+                    "type": "string",
+                    "description": "Path or URL to the CADD SNV score file for the CADD plugin.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "whole_genome_SNVs.tsv.gz (81 GB, .tbi provided) from https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/. GRCh38 only: CADD scores non-coding positions and so has no protein-space form usable on CHM13."
+                },
+                "vep_cadd_snv_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_cadd_snv.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_cadd_indel": {
+                    "type": "string",
+                    "description": "Path or URL to the CADD indel score file for the CADD plugin.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "gnomad.genomes.r4.0.indel.tsv.gz (1.2 GB, .tbi provided) from the same CADD release directory."
+                },
+                "vep_cadd_indel_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_cadd_indel.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_revel": {
+                    "type": "string",
+                    "description": "Path or URL to a prepared REVEL score file for the REVEL plugin.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "revel-v1.3_all_chromosomes.zip from https://sites.google.com/site/revelgenomics/downloads, reformatted and re-indexed on the GRCh38 column by bin/prepare_vep_plugin_data.sh. GRCh38 only. Free for non-commercial use."
+                },
+                "vep_revel_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_revel.",
+                    "fa_icon": "fas fa-file"
+                },
+                "vep_eve": {
+                    "type": "string",
+                    "description": "Path or URL to a merged EVE VCF for the EVE plugin.",
+                    "fa_icon": "fas fa-file",
+                    "help_text": "Per-protein VCFs from https://evemodel.org/api/proteins/bulk/download/, merged and indexed by bin/prepare_vep_plugin_data.sh. GRCh38 only."
+                },
+                "vep_eve_tbi": {
+                    "type": "string",
+                    "description": "Path or URL to the index for --vep_eve.",
+                    "fa_icon": "fas fa-file"
                 }
             }
         },

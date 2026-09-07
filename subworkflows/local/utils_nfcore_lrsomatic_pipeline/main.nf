@@ -269,6 +269,156 @@ def getGenomeAttribute(attribute) {
 }
 
 //
+// VEP plugin data files, keyed by the param that supplies them. The value is
+// the param holding the tabix index, or null when the resource needs none.
+//
+def vepPluginIndexParams() {
+    return [
+        'vep_alphamissense'   : 'vep_alphamissense_tbi',
+        'vep_alphamissense_aa': 'vep_alphamissense_aa_tbi',
+        'vep_polyphen_sift_db': null,
+        'vep_clinvar'         : 'vep_clinvar_tbi',
+        'vep_cadd_snv'        : 'vep_cadd_snv_tbi',
+        'vep_cadd_indel'      : 'vep_cadd_indel_tbi',
+        'vep_revel'           : 'vep_revel_tbi',
+        'vep_eve'             : 'vep_eve_tbi'
+    ]
+}
+
+//
+// Exit pipeline if VEP plugin params are inconsistent with each other or with
+// the target assembly. Checked up front so a run does not fail hours later
+// inside VEP.
+//
+def validateVepPluginParams() {
+    if (params.skip_vep) {
+        return
+    }
+
+    def errors = []
+
+    // Every indexed resource needs its index supplied explicitly: the index may
+    // not sit next to the data file when the data file is a URL.
+    vepPluginIndexParams().each { data_param, index_param ->
+        if (params[data_param] && index_param && !params[index_param]) {
+            errors << "  --${data_param} is set but --${index_param} is not. Both are required."
+        }
+    }
+
+    // Resources published only in GRCh37/GRCh38 coordinates cannot be used
+    // against the T2T-CHM13 cache.
+    def grch38_only = [
+        'vep_alphamissense': 'Use --vep_alphamissense_aa instead, which is keyed in protein space.',
+        'vep_cadd_snv'     : 'CADD scores non-coding positions and has no protein-space form, so it is unavailable on CHM13.',
+        'vep_cadd_indel'   : 'CADD scores non-coding positions and has no protein-space form, so it is unavailable on CHM13.',
+        'vep_revel'        : 'REVEL is published for GRCh37/GRCh38 only.',
+        'vep_eve'          : 'EVE is published for GRCh38 only.'
+    ]
+
+    if (params.vep_genome == 'T2T-CHM13v2.0') {
+        grch38_only.each { data_param, advice ->
+            if (params[data_param]) {
+                errors << "  --${data_param} is a GRCh38-only resource and cannot be used with --vep_genome T2T-CHM13v2.0. ${advice}"
+            }
+        }
+    }
+    else {
+        if (params.vep_alphamissense_aa) {
+            errors << "  --vep_alphamissense_aa is the CHM13 route to AlphaMissense. On ${params.vep_genome} use --vep_alphamissense instead."
+        }
+    }
+
+    if (errors) {
+        error(
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
+            "  Invalid VEP plugin configuration:\n" +
+            errors.join("\n") + "\n" +
+            "  See the VEP plugins section of docs/usage.md.\n" +
+            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+        )
+    }
+}
+
+//
+// Register a VEP plugin data file, and its index when there is one, on the
+// `staged` accumulator. Returns the basename that VEP should reference, since
+// the module stages these into the task workdir root.
+//
+def stageVepPluginFile(staged, data_param, index_param) {
+    def data_file = file(params[data_param], checkIfExists: true)
+    staged << data_file
+    if (index_param && params[index_param]) {
+        staged << file(params[index_param], checkIfExists: true)
+    }
+    return data_file.name
+}
+
+//
+// Resolve the configured VEP plugin data files into the list of files to stage
+// into the VEP task directory, and the matching VEP argument string.
+//
+// The module stages these through its `extra_files` input, which lands them in
+// the task workdir root, so every argument references a bare basename rather
+// than the original path or URL.
+//
+def resolveVepPlugins() {
+
+    def staged = []
+    def args = []
+
+    if (params.vep_alphamissense) {
+        args << "--plugin AlphaMissense,file=${stageVepPluginFile(staged, 'vep_alphamissense', 'vep_alphamissense_tbi')}"
+    }
+
+    if (params.vep_alphamissense_aa) {
+        // Our own plugin, so the .pm has to travel alongside its data. Adding
+        // --dir_plugins only prepends to @INC, leaving the plugins bundled in
+        // the container reachable.
+        staged << file("${projectDir}/assets/vep_plugins/AlphaMissenseProtein.pm", checkIfExists: true)
+        args << "--dir_plugins ."
+        args << "--plugin AlphaMissenseProtein,file=${stageVepPluginFile(staged, 'vep_alphamissense_aa', 'vep_alphamissense_aa_tbi')}"
+    }
+
+    if (params.vep_polyphen_sift_db) {
+        args << "--plugin PolyPhen_SIFT,db=${stageVepPluginFile(staged, 'vep_polyphen_sift_db', null)}"
+    }
+
+    if (params.vep_clinvar) {
+        // --custom takes a %-separated field list, unlike the comma-separated
+        // form used everywhere else.
+        def fields = (params.vep_clinvar_fields ?: '').tokenize(',').collect { it.trim() }.findAll().join('%')
+        def clinvar = "--custom file=${stageVepPluginFile(staged, 'vep_clinvar', 'vep_clinvar_tbi')},short_name=ClinVar,format=vcf,type=exact,coords=0"
+        args << (fields ? "${clinvar},fields=${fields}" : clinvar)
+    }
+
+    if (params.vep_cadd_snv || params.vep_cadd_indel) {
+        def cadd = []
+        if (params.vep_cadd_snv) {
+            cadd << "snv=${stageVepPluginFile(staged, 'vep_cadd_snv', 'vep_cadd_snv_tbi')}"
+        }
+        if (params.vep_cadd_indel) {
+            cadd << "indels=${stageVepPluginFile(staged, 'vep_cadd_indel', 'vep_cadd_indel_tbi')}"
+        }
+        args << "--plugin CADD,${cadd.join(',')}"
+    }
+
+    if (params.vep_revel) {
+        args << "--plugin REVEL,file=${stageVepPluginFile(staged, 'vep_revel', 'vep_revel_tbi')}"
+    }
+
+    if (params.vep_eve) {
+        args << "--plugin EVE,file=${stageVepPluginFile(staged, 'vep_eve', 'vep_eve_tbi')}"
+    }
+
+    // --vep_custom keeps its existing mechanism: it is passed to the module as
+    // its own input, and the user supplies the matching --custom skeleton in
+    // --vep_args which the module rewrites to the staged path. Nothing to do
+    // here beyond leaving that first --custom entry alone.
+
+    return [ files: staged, args: args.join(' ') ]
+}
+
+//
 // Exit pipeline if incorrect --genome key provided
 //
 def genomeExistsError() {
