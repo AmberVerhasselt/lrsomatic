@@ -104,7 +104,7 @@ workflow LRSOMATIC {
     // vep_plugin_args is read back by conf/modules.config when building
     // ext.args for the germline and somatic VEP runs.
     validateVepPluginParams()
-    def vep_plugins = resolveVepPlugins()
+    def vep_plugins = params.skip_vep ? [files: [], args: ''] : resolveVepPlugins()
     params.vep_plugin_args = vep_plugins.args
     // ch_vep_extra_files: the plugin .pm and data files staged into the VEP
     // task directory, which is why every plugin argument uses a basename.
