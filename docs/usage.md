@@ -454,7 +454,11 @@ Whether an index is required depends on the shape of what you supply:
   `--vep_alphamissense_tbi` as well and it uses both as they are. Same for
   `--vep_alphamissense_aa`, where a missing index means the protein-space table gets built.
 - **REVEL and EVE** ship as zip archives. Pass a `.zip` and the pipeline unpacks and reshapes it;
-  pass a prepared file and its index instead to use it directly.
+  pass a prepared file and its index instead to use it directly. A remote `.zip` is fetched with
+  `wget` rather than staged like the other files, because neither release host can be staged by
+  Nextflow directly: REVEL's answers `403` to a request carrying no `User-Agent`, and EVE's
+  redirects HTTPS to HTTP, which Nextflow refuses to follow. EVE's 9.6 GB archive also serves at a
+  few hundred KB/s, so expect hours — another reason it is opt-in.
 
 ### Where each default comes from
 
@@ -518,7 +522,9 @@ Two of these predictors get there anyway, because they score _proteins_ rather t
 ### What is not available, and why
 
 - **MutationTaster** — there is no MutationTaster plugin in Ensembl's `VEP_plugins`, and
-  MutationTaster 2021 is a web service. There is no offline route.
+  MutationTaster 2021 is a web service. Its scores are redistributed through dbNSFP, so an offline
+  route does exist, but dbNSFP's academic-only terms and the separately licensed components it
+  bundles make it unsuitable as a pipeline default.
 - **CADD on CHM13** — CADD scores non-coding positions as well as coding ones, so unlike SIFT,
   PolyPhen and AlphaMissense it has no protein-space representation to fall back on. It is
   structurally unavailable on CHM13, not merely unpublished.
@@ -529,9 +535,8 @@ Two of these predictors get there anyway, because they score _proteins_ rather t
 
 > [!IMPORTANT]
 > **CADD and REVEL are enabled by default and are free for non-commercial use only**; EVE, if you
-> enable it, is the same. The pipeline warns at startup when any of them is in use, but it cannot
-> accept those terms on your behalf. If your work is commercial, pass `--skip_vep_plugins`, or set
-> only the resources you are licensed for.
+> enable it, is the same. The pipeline cannot accept those terms on your behalf: if your work is
+> commercial, pass `--skip_vep_plugins`, or set only the resources you are licensed for.
 
 > [!IMPORTANT]
 > Check that the contig naming of every file you supply matches your reference. The GRCh38 reference

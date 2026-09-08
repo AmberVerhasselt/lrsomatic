@@ -43,16 +43,8 @@ usage() {
     exit "${1:-1}"
 }
 
-# ---------------------------------------------------------------------------
-# AlphaMissense: already tab-separated and position-sorted, so it only needs an
-# index.
-#
-# The release carries a few '#' licence lines followed by a column-name row.
-# Whether that row is itself '#'-prefixed has varied between releases, and
-# tabix's -S applies before comment detection, so a hardcoded -S 1 silently
-# leaves the column-name row to be parsed as data. Count the leading non-data
-# lines instead: a data line is one whose second field is a plain integer.
-# ---------------------------------------------------------------------------
+# AlphaMissense needs only an index. Count the leading non-data lines rather than hardcoding -S 1:
+# tabix applies -S before comment detection, so a wrong count silently parses the header row as data.
 prep_alphamissense() {
     local tsv=${1:-}
     [[ -n $tsv ]] || die "usage: $0 alphamissense <AlphaMissense_hg38.tsv.gz>"
@@ -76,12 +68,7 @@ prep_alphamissense() {
     echo "  --vep_alphamissense $tsv --vep_alphamissense_tbi $tsv.tbi" >&2
 }
 
-# ---------------------------------------------------------------------------
-# REVEL: the release is a zip holding one comma-separated file carrying both
-# GRCh37 (column 2) and GRCh38 (column 3) positions. For GRCh38 the rows have to
-# be re-sorted on column 3 and indexed on it, and rows without a GRCh38
-# position dropped.
-# ---------------------------------------------------------------------------
+# REVEL ships comma-separated, sorted on its GRCh37 column (2); GRCh38 (column 3) needs a re-sort and its own index.
 prep_revel() {
     local src=${1:-}
     local outdir=${2:-.}
@@ -128,10 +115,7 @@ prep_revel() {
     echo "  --vep_revel $out --vep_revel_tbi $out.tbi" >&2
 }
 
-# ---------------------------------------------------------------------------
-# EVE: the bulk download is one VCF per protein. Merge them into a single sorted,
-# indexed VCF, which is what the EVE plugin expects.
-# ---------------------------------------------------------------------------
+# EVE ships one VCF per protein; the plugin expects a single sorted, indexed VCF.
 prep_eve() {
     local vcfdir=${1:-}
     local outdir=${2:-.}

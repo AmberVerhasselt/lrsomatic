@@ -345,36 +345,24 @@ def getGenomeAttribute(attribute) {
 }
 
 //
-// Resolve a VEP plugin resource: an explicit --vep_* wins, otherwise the
-// per-assembly default from conf/igenomes.config. Read where it is used rather
-// than assigned back onto params, since these params are declared in
-// nextflow.config and a runtime assignment to a declared param is dropped --
-// the same reason vep_plugin_args is not declared there at all.
+// Resolve a VEP plugin resource: an explicit --vep_* wins, else the per-assembly default from conf/igenomes.config
+//
+// Read where it is used and never assigned back onto params: these are declared in nextflow.config,
+// and a runtime assignment to a declared param is silently dropped.
 //
 def vepPluginResource(name) {
     return params[name] ?: getGenomeAttribute(name)
 }
 
 //
-// True when no plugin annotation should happen at all.
+// True when no plugin annotation should happen at all
 //
 def vepPluginsSkipped() {
     return params.skip_vep || params.skip_vep_plugins
 }
 
 //
-// file(), checking existence for local paths only. A remote release is checked
-// when Nextflow stages it, and some endpoints reject the HEAD request that
-// checkIfExists relies on -- EVE's bulk download answers 405 to HEAD and 200
-// to GET.
-//
-def vepPluginFile(value) {
-    return value.toString().contains('://') ? file(value) : file(value, checkIfExists: true)
-}
-
-//
-// VEP plugin data files, keyed by the param that supplies them. The value is
-// the param holding the tabix index, or null when the resource needs none.
+// VEP plugin data files keyed by the param that supplies them; the value is the index param, or null when the resource needs none
 //
 def vepPluginIndexParams() {
     return [
@@ -390,12 +378,7 @@ def vepPluginIndexParams() {
 }
 
 //
-// Whether a resource still has to be reshaped before VEP can read it. Three of
-// them cannot be used as published: AlphaMissense ships without a tabix index,
-// and REVEL and EVE ship as zip archives. The pipeline reshapes those itself in
-// a prep task, so the shape of what was supplied is what decides -- a data file
-// with no index, or a .zip, is the raw release; anything else is already
-// prepared and is used as it stands.
+// Whether a resource still has to be reshaped before VEP can read it: AlphaMissense ships without an index, REVEL and EVE as zips
 //
 def vepPluginNeedsPrep(data_param) {
     def value = vepPluginResource(data_param)
@@ -412,16 +395,12 @@ def vepPluginNeedsPrep(data_param) {
 }
 
 //
-// The filename a prep task writes. Also what the VEP argument has to reference,
-// since the module stages every plugin file into the task workdir root.
-// Deterministic, so the argument string can still be assembled up front, before
-// any prep task has run.
+// The filename a prep task writes, which is what the VEP argument references since plugin files are staged into the task root
 //
 def vepPluginPreparedName(data_param) {
-    // AlphaMissense is indexed where it lies, so it keeps the name it was
-    // published under. The rest are written under a fixed name by their task.
+    // AlphaMissense is indexed where it lies, so it keeps its published name
     if (data_param == 'vep_alphamissense') {
-        return vepPluginFile(vepPluginResource(data_param)).name
+        return file(vepPluginResource(data_param)).name
     }
     return [
         'vep_alphamissense_aa': 'alphamissense_protein.tsv.gz',
@@ -431,40 +410,27 @@ def vepPluginPreparedName(data_param) {
 }
 
 //
-// Exit pipeline if VEP plugin params are inconsistent with each other or with
-// the target assembly. Checked up front so a run does not fail hours later
-// inside VEP, or after an 80 GB download.
+// Exit if the plugin params contradict each other or the target assembly, before a run reaches VEP or an 80 GB download
 //
 def validateVepPluginParams() {
     if (vepPluginsSkipped()) {
         return
     }
 
-    def errors = []
-
-    // An already-prepared resource needs its index supplied explicitly: the
-    // index may not sit next to the data file when the data file is a URL. The
-    // resources the pipeline can prepare itself are exempt, since for them a
-    // missing index is the signal to prepare one.
     def index_advice = [
         'vep_clinvar'   : 'ClinVar publishes a .tbi alongside every VCF.',
         'vep_cadd_snv'  : 'CADD publishes a .tbi alongside every score file.',
         'vep_cadd_indel': 'CADD publishes a .tbi alongside every score file.',
-        'vep_revel'     : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip and the pipeline will prepare both.',
-        'vep_eve'       : 'Either supply the index, or pass the published EVE_all_data.zip and the pipeline will prepare both.'
+        'vep_revel'     : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip to have both prepared.',
+        'vep_eve'       : 'Either supply the index, or pass the published EVE_all_data.zip to have both prepared.'
     ]
 
     vepPluginIndexParams().each { data_param, index_param ->
-        if (!index_param || !vepPluginResource(data_param) || vepPluginNeedsPrep(data_param)) {
-            return
-        }
-        if (!vepPluginResource(index_param)) {
-            errors << "  --${data_param} is set but --${index_param} is not. ${index_advice[data_param] ?: 'Both are required.'}"
+        if (index_param && vepPluginResource(data_param) && !vepPluginNeedsPrep(data_param) && !vepPluginResource(index_param)) {
+            error("--${data_param}: set without --${index_param}. ${index_advice[data_param] ?: 'Both are required.'}")
         }
     }
 
-    // Resources published only in GRCh37/GRCh38 coordinates cannot be used
-    // against the T2T-CHM13 cache.
     def grch38_only = [
         'vep_alphamissense': 'Use --vep_alphamissense_aa instead, which is keyed in protein space.',
         'vep_cadd_snv'     : 'CADD scores non-coding positions and has no protein-space form, so it is unavailable on CHM13.',
@@ -476,122 +442,44 @@ def validateVepPluginParams() {
     if (params.vep_genome == 'T2T-CHM13v2.0') {
         grch38_only.each { data_param, advice ->
             if (vepPluginResource(data_param)) {
-                errors << "  --${data_param} is a GRCh38-only resource and cannot be used with --vep_genome T2T-CHM13v2.0. ${advice}"
+                error("--${data_param}: a GRCh38-only resource, which cannot be used with --vep_genome T2T-CHM13v2.0. ${advice}")
             }
         }
     }
-    else {
-        if (vepPluginResource('vep_alphamissense_aa')) {
-            errors << "  --vep_alphamissense_aa is the CHM13 route to AlphaMissense. On ${params.vep_genome} use --vep_alphamissense instead."
-        }
-    }
-
-    if (errors) {
-        error(
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\n" +
-            "  Invalid VEP plugin configuration:\n" +
-            errors.join("\n") + "\n" +
-            "  See the VEP plugins section of docs/usage.md.\n" +
-            "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
-        )
+    else if (vepPluginResource('vep_alphamissense_aa')) {
+        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. On ${params.vep_genome} use --vep_alphamissense instead.")
     }
 }
 
 //
-// Say what a run is about to fetch, and under what terms. The plugin data is on
-// by default, so both facts have to be visible without reading the docs first.
-//
-// Only resources still resolving to a URL are reported: a local path means the
-// user has already downloaded it and nothing will be fetched.
-//
-def warnVepPluginDownloads() {
-    if (vepPluginsSkipped()) {
-        return
-    }
-
-    // Approximate published sizes, for the resources big enough that this is
-    // worth knowing before the download starts rather than after.
-    def sizes = [
-        'vep_cadd_snv'        : '81 GB',
-        'vep_polyphen_sift_db': '13 GB',
-        'vep_eve'             : '9.6 GB',
-        'vep_cadd_indel'      : '1.2 GB',
-        'vep_alphamissense_aa': '1.1 GB',
-        'vep_revel'           : '667 MB',
-        'vep_alphamissense'   : '613 MB'
-    ]
-
-    def fetching = sizes.findAll { data_param, _size ->
-        vepPluginResource(data_param)?.toString()?.contains('://')
-    }
-
-    if (fetching) {
-        log.warn(
-            "VEP plugin data will be downloaded: ${fetching.collect { data_param, size -> "${data_param} (${size})" }.join(', ')}. " +
-            "Nothing prepared is published, so a fresh work directory downloads again -- pass a local path to the matching " +
-            "--vep_* param to reuse a copy you already have. See the VEP plugins section of docs/usage.md."
-        )
-    }
-
-    // Non-commercial resources are enabled by default, so say so rather than
-    // leaving the user to discover it in a licence file.
-    def non_commercial = [
-        'vep_cadd_snv'  : 'CADD',
-        'vep_cadd_indel': 'CADD',
-        'vep_revel'     : 'REVEL',
-        'vep_eve'       : 'EVE'
-    ]
-
-    def in_use = non_commercial
-        .findAll { data_param, _tool -> vepPluginResource(data_param) }
-        .values()
-        .toList()
-        .unique()
-
-    if (in_use) {
-        log.warn(
-            "VEP annotation includes ${in_use.join(', ')}, which are free for non-commercial use only. " +
-            "Observing those terms is your responsibility. --skip_vep_plugins turns the plugin annotation off."
-        )
-    }
-}
-
-//
-// Register an already-prepared VEP plugin data file, and its index when there
-// is one, on the `staged` accumulator. Returns the basename that VEP should
-// reference, since the module stages these into the task workdir root.
+// Register an already-usable plugin file and its index on `staged`, returning the basename VEP should reference
 //
 def stageVepPluginFile(staged, data_param, index_param) {
-    def data_file = vepPluginFile(vepPluginResource(data_param))
+    def data_file = file(vepPluginResource(data_param), checkIfExists: true)
     staged << data_file
     if (index_param && vepPluginResource(index_param)) {
-        staged << vepPluginFile(vepPluginResource(index_param))
+        staged << file(vepPluginResource(index_param), checkIfExists: true)
     }
     return data_file.name
 }
 
 //
-// Register one resource on the accumulators, returning the basename VEP should
-// reference. Either the resource is usable as supplied -- staged under its own
-// name -- or it is a raw release, in which case a prep task is recorded and the
-// name that task will write is returned instead.
+// Register one resource: staged as supplied, or recorded for a prep task whose output filename is returned instead
+//
+// A resource needing prep is recorded as its raw value rather than a file(), because the REVEL and EVE
+// release hosts cannot be staged by Nextflow at all -- one 403s without a User-Agent, the other
+// redirects HTTPS to HTTP -- so PREPARE_VEP_PLUGINS fetches those through WGET instead.
 //
 def registerVepPlugin(staged, prepare, data_param) {
     if (vepPluginNeedsPrep(data_param)) {
-        prepare[data_param] = vepPluginFile(vepPluginResource(data_param))
+        prepare[data_param] = vepPluginResource(data_param)
         return vepPluginPreparedName(data_param)
     }
     return stageVepPluginFile(staged, data_param, vepPluginIndexParams()[data_param])
 }
 
 //
-// Resolve the configured VEP plugins into three things: the VEP argument string,
-// the already-prepared files to stage into the VEP task directory, and the raw
-// releases still to be reshaped by a prep task.
-//
-// The module stages plugin files through its `extra_files` input, which lands
-// them in the task workdir root, so every argument references a bare basename
-// rather than the original path or URL.
+// Resolve the plugins into the VEP argument string, the files to stage, and the raw releases still to be reshaped
 //
 def resolveVepPlugins() {
     if (vepPluginsSkipped()) {
@@ -607,9 +495,7 @@ def resolveVepPlugins() {
     }
 
     if (vepPluginResource('vep_alphamissense_aa')) {
-        // Our own plugin, so the .pm has to travel alongside its data. Adding
-        // --dir_plugins only prepends to @INC, leaving the plugins bundled in
-        // the container reachable.
+        // Our own plugin, so the .pm travels with its data; --dir_plugins only prepends to @INC, leaving the container's plugins reachable
         staged << file("${projectDir}/assets/vep_plugins/AlphaMissenseProtein.pm", checkIfExists: true)
         args << "--dir_plugins ."
         args << "--plugin AlphaMissenseProtein,file=${registerVepPlugin(staged, prepare, 'vep_alphamissense_aa')}"
@@ -620,8 +506,7 @@ def resolveVepPlugins() {
     }
 
     if (vepPluginResource('vep_clinvar')) {
-        // --custom takes a %-separated field list, unlike the comma-separated
-        // form used everywhere else.
+        // --custom takes a %-separated field list, unlike the comma-separated form used everywhere else
         def fields = (params.vep_clinvar_fields ?: '').tokenize(',').collect { it.trim() }.findAll().join('%')
         def clinvar = "--custom file=${registerVepPlugin(staged, prepare, 'vep_clinvar')},short_name=ClinVar,format=vcf,type=exact,coords=0"
         args << (fields ? "${clinvar},fields=${fields}" : clinvar)
@@ -646,11 +531,7 @@ def resolveVepPlugins() {
         args << "--plugin EVE,file=${registerVepPlugin(staged, prepare, 'vep_eve')}"
     }
 
-    // --vep_custom keeps its existing mechanism: it is passed to the module as
-    // its own input, and the user supplies the matching --custom skeleton in
-    // --vep_args which the module rewrites to the staged path. Nothing to do
-    // here beyond leaving that first --custom entry alone.
-
+    // --vep_custom keeps its own mechanism: the module rewrites the first --custom entry of --vep_args to the path it staged
     return [ args: args.join(' '), ready_files: staged, prepare: prepare ]
 }
 

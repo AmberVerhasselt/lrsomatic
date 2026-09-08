@@ -11,7 +11,7 @@ include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_lrso
 include { getGenomeAttribute     } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { reportGenePanelTokens  } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { reportGenePanelIsFile  } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
-include { resolveVepPlugins; validateVepPluginParams; warnVepPluginDownloads } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
+include { resolveVepPlugins; validateVepPluginParams } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { PREPARE_VEP_PLUGINS    } from '../subworkflows/local/prepare_vep_plugins'
 
 //
@@ -103,15 +103,8 @@ workflow LRSOMATIC {
     params.vep_genome = getGenomeAttribute('vep_genome')
     params.vep_species = getGenomeAttribute('vep_species')
 
-    // Resolve the configured VEP plugins. Fails fast on an inconsistent
-    // combination -- notably a GRCh38-only score file against the CHM13 cache --
-    // then says what is about to be downloaded and on what terms.
-    //
-    // vep_plugin_args is read back by conf/modules.config when building ext.args
-    // for the germline and somatic VEP runs. The files themselves are assembled
-    // by PREPARE_VEP_PLUGINS, below, once VEP is known to be running.
+    // vep_plugin_args is read back by conf/modules.config; the files themselves are assembled by PREPARE_VEP_PLUGINS
     validateVepPluginParams()
-    warnVepPluginDownloads()
     params.vep_plugin_args = resolveVepPlugins().args
 
     // Defined here rather than inside the VEP blocks below, since both the
@@ -734,12 +727,7 @@ workflow LRSOMATIC {
         //
         // SUBWORKFLOW: PREPARE_VEP_PLUGINS
         // Input:  none -- reads the resolved --vep_* configuration itself
-        // Output: .extra_files -- every plugin .pm and data file to stage into
-        //         the VEP task directory, which is why each plugin argument in
-        //         conf/modules.config uses a bare basename
-        //
-        // Reshapes the releases that VEP cannot read as published. Emits an
-        // empty list when no plugins are configured.
+        // Output: .extra_files -- plugin .pm and data files to stage, empty when none are configured
         //
         PREPARE_VEP_PLUGINS ()
 
@@ -846,10 +834,7 @@ workflow LRSOMATIC {
         // Input:  sv_vep -- [meta, vcf, []]  -- SEVERUS SV VCF
         // Output: annotated SV VCF with consequence predictions
         //
-        // No plugin files are staged here: missense and splice scores are
-        // meaningless on SV breakends, and staging them would cost tens of GB
-        // per task for empty columns. See conf/modules.config, where SV_VEP
-        // keeps the plain vep_args.
+        // No plugin files: missense and splice scores are meaningless on SEVERUS breakends
         //
         SV_VEP (
             sv_vep,
