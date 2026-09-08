@@ -52,7 +52,9 @@ prep_alphamissense() {
     need bgzip tabix
 
     local skip
-    skip=$(gzip -dc "$tsv" | awk -F'\t' '
+    # `|| true` because awk exits at the first data line, so gzip takes a SIGPIPE that
+    # pipefail would otherwise turn into a silent abort of the whole script.
+    skip=$( { gzip -dc "$tsv" || true; } | awk -F'\t' '
         $2 ~ /^[0-9]+$/ { print NR - 1; found = 1; exit }
         NR > 100        { exit }
         END             { if (!found) print "NONE" }
