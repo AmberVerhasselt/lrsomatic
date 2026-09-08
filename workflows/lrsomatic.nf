@@ -9,7 +9,8 @@ include { paramsSummaryMultiqc   } from '../subworkflows/nf-core/utils_nfcore_pi
 include { softwareVersionsToYAML } from '../subworkflows/nf-core/utils_nfcore_pipeline'
 include { methodsDescriptionText } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { getGenomeAttribute     } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
-include { resolveVepPlugins; validateVepPluginParams } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
+include { resolveVepPlugins; validateVepPluginParams; warnVepPluginDownloads } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
+include { PREPARE_VEP_PLUGINS    } from '../subworkflows/local/prepare_vep_plugins'
 
 //
 // IMPORT MODULES
@@ -99,16 +100,16 @@ workflow LRSOMATIC {
     params.vep_genome = getGenomeAttribute('vep_genome')
     params.vep_species = getGenomeAttribute('vep_species')
 
-    // Resolve the configured VEP plugins once. Fails fast on an inconsistent
-    // combination -- notably a GRCh38-only score file against the CHM13 cache.
-    // vep_plugin_args is read back by conf/modules.config when building
-    // ext.args for the germline and somatic VEP runs.
+    // Resolve the configured VEP plugins. Fails fast on an inconsistent
+    // combination -- notably a GRCh38-only score file against the CHM13 cache --
+    // then says what is about to be downloaded and on what terms.
+    //
+    // vep_plugin_args is read back by conf/modules.config when building ext.args
+    // for the germline and somatic VEP runs. The files themselves are assembled
+    // by PREPARE_VEP_PLUGINS, below, once VEP is known to be running.
     validateVepPluginParams()
-    def vep_plugins = params.skip_vep ? [files: [], args: ''] : resolveVepPlugins()
-    params.vep_plugin_args = vep_plugins.args
-    // ch_vep_extra_files: the plugin .pm and data files staged into the VEP
-    // task directory, which is why every plugin argument uses a basename.
-    ch_vep_extra_files = channel.value(vep_plugins.files)
+    warnVepPluginDownloads()
+    params.vep_plugin_args = resolveVepPlugins().args
 
     // Defined here rather than inside the VEP blocks below, since both the
     // small-variant and the SV block need them.
@@ -724,6 +725,21 @@ workflow LRSOMATIC {
     }
 
     if (!params.skip_vep) {
+
+        //
+        // SUBWORKFLOW: PREPARE_VEP_PLUGINS
+        // Input:  none -- reads the resolved --vep_* configuration itself
+        // Output: .extra_files -- every plugin .pm and data file to stage into
+        //         the VEP task directory, which is why each plugin argument in
+        //         conf/modules.config uses a bare basename
+        //
+        // Reshapes the releases that VEP cannot read as published. Emits an
+        // empty list when no plugins are configured.
+        //
+        PREPARE_VEP_PLUGINS ()
+
+        ch_vep_extra_files = PREPARE_VEP_PLUGINS.out.extra_files
+        ch_versions = ch_versions.mix(PREPARE_VEP_PLUGINS.out.versions)
 
         //
         // MODULE: GERMLINE_VEP (ENSEMBLVEP_VEP alias; label: process_medium)

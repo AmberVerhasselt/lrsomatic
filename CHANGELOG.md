@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
-- [#185](https://github.com/IntGenomicsLab/lrsomatic/pull/185) - Added optional VEP plugins for AlphaMissense, SIFT/PolyPhen, ClinVar, CADD, REVEL and EVE on GRCh38, and AlphaMissense plus SIFT/PolyPhen on CHM13 via protein-space lookup. All are off unless their data file is supplied; nothing is redistributed by the pipeline (@AmberVerhasselt).
+- [#185](https://github.com/IntGenomicsLab/lrsomatic/pull/185) - Added VEP plugins for AlphaMissense, SIFT/PolyPhen, ClinVar, CADD and REVEL on GRCh38, and AlphaMissense plus SIFT/PolyPhen on CHM13 via protein-space lookup. Enabled by default with `--genome GRCh38` or `--genome CHM13`: the pipeline fetches each resource from its original source and prepares the releases VEP cannot read as published, so a first GRCh38 run downloads around 83 GB. Any `--vep_*` path overrides its default, and `--skip_vep_plugins` turns the set off. EVE is wired up but left opt-in behind `--vep_eve`. Nothing is redistributed or published to the output directory (@AmberVerhasselt).
 
 ### `Changed`
 

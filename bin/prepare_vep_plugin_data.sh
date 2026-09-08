@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
 #
-# One-time preparation of VEP plugin data files.
+# Preparation of VEP plugin data files.
 #
 # AlphaMissense, REVEL and EVE cannot be handed to VEP exactly as published:
 # AlphaMissense needs a tabix index, REVEL ships comma-separated and sorted on
-# its GRCh37 column, and EVE ships as thousands of per-protein VCFs. This script
-# does that reshaping once, so it is not repeated on every pipeline run.
+# its GRCh37 column, and EVE ships as thousands of per-protein VCFs.
 #
-# Nothing is redistributed by the pipeline: you download the inputs yourself and
-# the outputs stay on your filesystem. See docs/usage.md for the download URLs
-# and the licence terms of each resource -- CADD, REVEL and EVE are free for
-# non-commercial use only, and observing that is the user's responsibility.
+# The pipeline calls this script itself, from modules/local/vepplugin/*, so a
+# default run needs no manual preparation. Run it by hand to produce files you
+# can then pass to --vep_alphamissense / --vep_revel / --vep_eve, which skips
+# both the download and the prep task on every subsequent run.
+#
+# Nothing is redistributed: the inputs are fetched from their original source
+# and the outputs stay on your filesystem. See docs/usage.md for the download
+# URLs and the licence terms of each resource -- CADD, REVEL and EVE are free
+# for non-commercial use only, and observing that is the user's responsibility.
 #
 # Usage:
 #   bin/prepare_vep_plugin_data.sh alphamissense AlphaMissense_hg38.tsv.gz
-#   bin/prepare_vep_plugin_data.sh revel revel-v1.3_all_chromosomes.zip <outdir>
+#   bin/prepare_vep_plugin_data.sh revel <zip-or-unpacked-dir> <outdir>
 #   bin/prepare_vep_plugin_data.sh eve <eve-vcf-dir> <outdir>
 #
 # ClinVar, CADD and the Ensembl pangenome PolyPhen/SIFT database need no
 # preparation: ClinVar and CADD ship their own .tbi, and the pangenome file is
 # an SQLite database.
 #
-# Requires: bgzip and tabix (htslib), awk, sort, unzip (for REVEL).
+# Requires: bgzip and tabix (htslib), awk, sort, and unzip when REVEL is given
+# the release zip rather than an already-unpacked directory.
 
 set -euo pipefail
 
@@ -34,7 +39,7 @@ need() {
 }
 
 usage() {
-    sed -n '2,25p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
+    sed -n '2,29p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
     exit "${1:-1}"
 }
 
@@ -78,23 +83,32 @@ prep_alphamissense() {
 # position dropped.
 # ---------------------------------------------------------------------------
 prep_revel() {
-    local zip=${1:-}
+    local src=${1:-}
     local outdir=${2:-.}
-    [[ -n $zip ]] || die "usage: $0 revel <revel-v1.3_all_chromosomes.zip> [outdir]"
-    [[ -r $zip ]] || die "cannot read $zip"
-    need bgzip tabix unzip awk sort
+    [[ -n $src ]] || die "usage: $0 revel <revel-v1.3_all_chromosomes.zip|unpacked-dir> [outdir]"
+    [[ -r $src ]] || die "cannot read $src"
+    need bgzip tabix awk sort
 
     mkdir -p "$outdir"
     local work
     work=$(mktemp -d "${TMPDIR:-/tmp}/revel.XXXXXX")
     trap 'rm -rf "$work"' RETURN
 
-    echo ">> unpacking $zip" >&2
-    unzip -o -q -d "$work" "$zip"
+    # Either the release zip or a directory it has already been unpacked into,
+    # so the pipeline can leave the unpacking to a container that has unzip.
+    local searchdir=$src
+    if [[ -f $src ]]; then
+        need unzip
+        echo ">> unpacking $src" >&2
+        unzip -o -q -d "$work" "$src"
+        searchdir=$work
+    elif [[ ! -d $src ]]; then
+        die "$src is neither a zip file nor a directory"
+    fi
 
     local raw
-    raw=$(find "$work" -name 'revel_with_transcript_ids' -o -name 'revel_all_chromosomes.csv' | head -n1)
-    [[ -n $raw ]] || die "could not find the REVEL table inside $zip"
+    raw=$(find "$searchdir" -name 'revel_with_transcript_ids' -o -name 'revel_all_chromosomes.csv' | head -n1)
+    [[ -n $raw ]] || die "could not find the REVEL table in $src"
     echo "   using $(basename "$raw")" >&2
 
     local out="$outdir/revel_grch38.tsv.gz"

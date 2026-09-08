@@ -9,8 +9,13 @@
 # symbol -- the join key the plugin uses, because CHM13 rapid-release stable IDs
 # are unrelated to GRCh38 Ensembl IDs -- and writes a tabix-indexed table.
 #
-# Nothing here is redistributed by the pipeline: you download the inputs
-# yourself and the output stays on your filesystem.
+# The pipeline calls this script itself, from
+# modules/local/vepplugin/alphamissense_protein, so a CHM13 run needs no manual
+# preparation. Run it by hand to produce a table you can then pass to
+# --vep_alphamissense_aa, which skips both the download and the prep task.
+#
+# Nothing here is redistributed: the inputs are fetched from their original
+# source and the output stays on your filesystem.
 #
 # DATA LICENCE
 #   AlphaMissense Database, Copyright (2023) DeepMind Technologies Limited,
@@ -44,7 +49,7 @@ OUTPUT=""
 TMPDIR_ARG=""
 
 usage() {
-    sed -n '2,40p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
+    sed -n '2,42p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
     exit "${1:-1}"
 }
 

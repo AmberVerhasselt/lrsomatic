@@ -1,0 +1,68 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/nf-core/modules/master/modules/meta-schema.json
+name: "vepplugin_alphamissense_protein"
+description: Build the protein-space AlphaMissense table used by the AlphaMissenseProtein plugin on CHM13
+keywords:
+  - vep
+  - alphamissense
+  - chm13
+  - protein
+  - pathogenicity
+tools:
+  - "htslib":
+      description: "C library for high-throughput sequencing data formats"
+      homepage: "http://www.htslib.org/"
+      documentation: "http://www.htslib.org/doc/tabix.html"
+      tool_dev_url: "https://github.com/samtools/htslib"
+      doi: "10.1093/gigascience/giab007"
+      licence: ["MIT"]
+      identifier: biotools:htslib
+
+input:
+  - - aa_substitutions:
+        type: file
+        description: |
+          AlphaMissense protein-space release, keyed by UniProt accession and
+          amino-acid substitution.
+        pattern: "*.tsv.gz"
+  - - idmapping:
+        type: file
+        description: |
+          UniProt human ID mapping, used to re-key the table onto gene symbols.
+          Passed in rather than downloaded by the script, so the task needs no
+          network access and Nextflow caches the file.
+        pattern: "*.dat.gz"
+
+output:
+  files:
+    - "alphamissense_protein.tsv.gz{,.tbi}":
+        type: file
+        description: Gene-symbol-keyed AlphaMissense table and its tabix index
+        pattern: "alphamissense_protein.tsv.gz{,.tbi}"
+  versions_tabix:
+    - - ${task.process}:
+          type: string
+          description: The process the versions were collected from
+      - tabix:
+          type: string
+          description: The tool name
+      - "tabix -h 2>&1 | grep -oP 'Version:\\s*\\K[^\\s]+'":
+          type: string
+          description: The command used to generate the version of the tool
+
+topics:
+  versions:
+    - - ${task.process}:
+          type: string
+          description: The process the versions were collected from
+      - tabix:
+          type: string
+          description: The tool name
+      - "tabix -h 2>&1 | grep -oP 'Version:\\s*\\K[^\\s]+'":
+          type: string
+          description: The command used to generate the version of the tool
+
+authors:
+  - "@AmberVerhasselt"
+maintainers:
+  - "@AmberVerhasselt"

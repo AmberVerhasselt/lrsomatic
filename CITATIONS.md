@@ -132,7 +132,7 @@
 
 - [AlphaMissense Database](https://console.cloud.google.com/storage/browser/dm_alphamissense)
 
-  Optional VEP plugin data, supplied by the user via `--vep_alphamissense` (GRCh38) or
+  VEP plugin data, fetched from this bucket by default via `--vep_alphamissense` (GRCh38) or
   `--vep_alphamissense_aa` (CHM13). AlphaMissense Database, Copyright (2023) DeepMind Technologies
   Limited, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
   `bin/build_alphamissense_protein_table.sh` produces an adapted version of this data: the released
@@ -142,14 +142,15 @@
 
 - [Ensembl pangenome PolyPhen/SIFT database](https://ftp.ensembl.org/pub/current_variation/pangenomes/Human/)
 
-  Optional VEP plugin data for the `PolyPhen_SIFT` plugin, supplied by the user via
+  VEP plugin data for the `PolyPhen_SIFT` plugin, fetched by default on `--genome CHM13` via
   `--vep_polyphen_sift_db`. This is how SIFT and PolyPhen predictions reach T2T-CHM13, since the
   lookup is keyed on the MD5 of the peptide sequence rather than on genome coordinates.
 
 - [UniProt ID mapping](https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/)
 
-  Used by `bin/build_alphamissense_protein_table.sh` to map UniProt accessions to gene symbols.
-  UniProtKB is licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
+  Used by `bin/build_alphamissense_protein_table.sh` to map UniProt accessions to gene symbols, and
+  so fetched by default on `--genome CHM13` via `--vep_uniprot_idmapping`. UniProtKB is licensed
+  [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
 
 - [ASAP Panel of Normals](https://www.biorxiv.org/content/10.64898/2026.03.15.711881v1)
 
