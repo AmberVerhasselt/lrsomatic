@@ -106,6 +106,14 @@
 
   > Ng PC, Henikoff S. SIFT: Predicting amino acid changes that affect protein function. Nucleic Acids Res. 2003 Jul 1;31(13):3812-4. doi: 10.1093/nar/gkg509.
 
+- [SigProfilerAssignment](https://pubmed.ncbi.nlm.nih.gov/38096571/)
+
+  > Díaz-Gay M, Vangara R, Barnes M, Wang X, Islam SMA, Vermes I, Duke S, Narasimman NB, Yang T, Jiang Z, Moody S, Senkin S, Brennan P, Stratton MR, Alexandrov LB. Assigning mutational signatures to individual samples and individual somatic mutations with SigProfilerAssignment. Bioinformatics. 2023 Dec 1;39(12):btad756. doi: 10.1093/bioinformatics/btad756. PubMed PMID: 38096571; PubMed Central PMCID: PMC10733897.
+
+- [SigProfilerMatrixGenerator](https://pubmed.ncbi.nlm.nih.gov/31470794/)
+
+  > Bergstrom EN, Huang MN, Mahto U, Barnes M, Stratton MR, Rozen SG, Alexandrov LB. SigProfilerMatrixGenerator: a tool for visualizing and exploring patterns of small mutational events. BMC Genomics. 2019 Aug 30;20(1):685. doi: 10.1186/s12864-019-6041-2. PubMed PMID: 31470794; PubMed Central PMCID: PMC6717374.
+
 - [Wakhan](https://github.com/KolmogorovLab/Wakhan)
 
   > A tool to analyze haplotype-specific chromosome-scale somatic copy number aberrations and aneuploidy using long reads (Oxford Nanopore, PacBio). https://github.com/KolmogorovLab/Wakhan
