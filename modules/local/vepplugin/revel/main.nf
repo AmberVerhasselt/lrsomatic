@@ -20,8 +20,7 @@ process VEPPLUGIN_REVEL {
     script:
     def args = task.ext.args ?: ''
     """
-    # The release is sorted on its GRCh37 column; the script re-sorts on GRCh38
-    # and indexes on that, which needs scratch space rather than /tmp.
+    # The re-sort onto the GRCh38 column needs scratch space rather than /tmp
     export TMPDIR=\${TMPDIR:-\$PWD}
 
     prepare_vep_plugin_data.sh revel ${revel_dir} . ${args}

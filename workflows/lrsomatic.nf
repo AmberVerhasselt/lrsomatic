@@ -103,12 +103,10 @@ workflow LRSOMATIC {
     params.vep_genome = getGenomeAttribute('vep_genome')
     params.vep_species = getGenomeAttribute('vep_species')
 
-    // vep_plugin_args is read back by conf/modules.config; the files themselves are assembled by PREPARE_VEP_PLUGINS
+    // vep_plugin_args is read back by conf/modules.config
     validateVepPluginParams()
     params.vep_plugin_args = resolveVepPlugins().args
 
-    // Defined here rather than inside the VEP blocks below, since both the
-    // small-variant and the SV block need them.
     vep_custom = params.vep_custom != null ? file(params.vep_custom) : []
     vep_custom_tbi = params.vep_custom_tbi != null ? file(params.vep_custom_tbi) : []
 
@@ -833,7 +831,6 @@ workflow LRSOMATIC {
         // MODULE: SV_VEP (ENSEMBLVEP_VEP alias; label: process_medium)
         // Input:  sv_vep -- [meta, vcf, []]  -- SEVERUS SV VCF
         // Output: annotated SV VCF with consequence predictions
-        //
         // No plugin files: missense and splice scores are meaningless on SEVERUS breakends
         //
         SV_VEP (

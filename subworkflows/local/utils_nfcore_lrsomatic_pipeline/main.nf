@@ -346,10 +346,7 @@ def getGenomeAttribute(attribute) {
 }
 
 //
-// Resolve a VEP plugin resource: an explicit --vep_* wins, else the per-assembly default from conf/igenomes.config
-//
-// Read where it is used and never assigned back onto params: these are declared in nextflow.config,
-// and a runtime assignment to a declared param is silently dropped.
+// Resolve a VEP plugin resource: an explicit --vep_* wins, else the per-assembly default
 //
 def vepPluginResource(name) {
     return params[name] ?: getGenomeAttribute(name)
@@ -363,7 +360,7 @@ def vepPluginsSkipped() {
 }
 
 //
-// VEP plugin data files keyed by the param that supplies them; the value is the index param, or null when the resource needs none
+// VEP plugin data params, each mapped to its index param, or to null when it needs none
 //
 def vepPluginIndexParams() {
     return [
@@ -379,11 +376,8 @@ def vepPluginIndexParams() {
 }
 
 //
-// The index for a plugin data file, or null when there is none to use
-//
-// An index default only belongs to the data file it was published beside, so overriding the data
-// file drops it: pairing a user's score file with the default index silently points tabix at an
-// index built for different content.
+// The index for a plugin data file, or null when there is none. Overriding the data file drops the
+// default index, which was built from different content
 //
 def vepPluginIndex(data_param) {
     def index_param = vepPluginIndexParams()[data_param]
@@ -394,7 +388,7 @@ def vepPluginIndex(data_param) {
 }
 
 //
-// Whether a resource still has to be reshaped before VEP can read it, which is the case only for the releases that ship as a zip
+// Whether a resource still has to be reshaped before VEP can read it, true only for a release zip
 //
 def vepPluginNeedsPrep(data_param) {
     def value = vepPluginResource(data_param)
@@ -404,7 +398,7 @@ def vepPluginNeedsPrep(data_param) {
 }
 
 //
-// The filename a prep task writes, which is what the VEP argument references since plugin files are staged into the task root
+// The filename a prep task writes, referenced by the VEP argument since plugins stage into the task root
 //
 def vepPluginPreparedName(data_param) {
     return [
@@ -414,7 +408,7 @@ def vepPluginPreparedName(data_param) {
 }
 
 //
-// Exit if the plugin params contradict each other or the target assembly, before a run reaches VEP or an 80 GB download
+// Exit if the plugin params contradict each other or the target assembly, before any download
 //
 def validateVepPluginParams() {
     if (vepPluginsSkipped()) {
@@ -458,7 +452,7 @@ def validateVepPluginParams() {
 }
 
 //
-// Register an already-usable plugin file and its index on `staged`, returning the basename VEP should reference
+// Stage an already-usable plugin file and its index, returning the basename VEP should reference
 //
 def stageVepPluginFile(staged, data_param) {
     def data_file = file(vepPluginResource(data_param), checkIfExists: true)
@@ -471,11 +465,10 @@ def stageVepPluginFile(staged, data_param) {
 }
 
 //
-// Register one resource: staged as supplied, or recorded for a prep task whose output filename is returned instead
+// Register one resource: staged as supplied, or recorded for a prep task whose output name is returned
 //
-// A resource needing prep is recorded as its raw value rather than a file(), because the REVEL and EVE
-// release hosts cannot be staged by Nextflow at all -- one 403s without a User-Agent, the other
-// redirects HTTPS to HTTP -- so PREPARE_VEP_PLUGINS fetches those through WGET instead.
+// A resource needing prep is kept as its raw value rather than a file(), since neither the REVEL nor
+// the EVE host can be staged by Nextflow -- PREPARE_VEP_PLUGINS fetches those with WGET instead.
 //
 def registerVepPlugin(staged, prepare, data_param) {
     if (vepPluginNeedsPrep(data_param)) {
@@ -486,7 +479,7 @@ def registerVepPlugin(staged, prepare, data_param) {
 }
 
 //
-// Resolve the plugins into the VEP argument string, the files to stage, and the raw releases still to be reshaped
+// Resolve the plugins into the VEP argument string, the files to stage, and the releases to reshape
 //
 def resolveVepPlugins() {
     if (vepPluginsSkipped()) {
@@ -502,7 +495,7 @@ def resolveVepPlugins() {
     }
 
     if (vepPluginResource('vep_alphamissense_aa')) {
-        // Our own plugin, so the .pm travels with its data; --dir_plugins only prepends to @INC, leaving the container's plugins reachable
+        // Our own plugin, so the .pm travels with its data; --dir_plugins only prepends to @INC
         staged << file("${projectDir}/assets/vep_plugins/AlphaMissenseProtein.pm", checkIfExists: true)
         args << "--dir_plugins ."
         args << "--plugin AlphaMissenseProtein,file=${registerVepPlugin(staged, prepare, 'vep_alphamissense_aa')}"
@@ -538,7 +531,6 @@ def resolveVepPlugins() {
         args << "--plugin EVE,file=${registerVepPlugin(staged, prepare, 'vep_eve')}"
     }
 
-    // --vep_custom keeps its own mechanism: the module rewrites the first --custom entry of --vep_args to the path it staged
     return [ args: args.join(' '), ready_files: staged, prepare: prepare ]
 }
 

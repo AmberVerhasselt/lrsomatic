@@ -1,7 +1,5 @@
 //
-// Reshape the VEP plugin releases that ship as zip archives: REVEL and EVE. Nothing is published --
-// the prepared files live in the work directory, shared by every VEP task in the run, and a local
-// path to a prepared file skips all of this.
+// Reshape the VEP plugin releases that ship as zip archives (REVEL and EVE)
 //
 
 include { UNZIP as UNZIP_REVEL } from '../../modules/nf-core/unzip/main.nf'
@@ -17,8 +15,7 @@ workflow PREPARE_VEP_PLUGINS {
 
     main:
 
-    // Resolved here rather than taken as an input: which prep tasks to run is a plain Groovy
-    // decision, and a workflow input would arrive wrapped in a channel.
+    // Resolved here rather than taken as an input: a workflow input would arrive in a channel
     def plugins = resolveVepPlugins()
     def prepare = plugins.prepare
 
@@ -29,10 +26,8 @@ workflow PREPARE_VEP_PLUGINS {
     // MODULES: WGET_REVEL -> UNZIP_REVEL -> VEPPLUGIN_REVEL (labels: process_single, process_single, process_medium)
     // Input:  the REVEL release, as a URL or as a local zip
     // Output: .files -- revel_grch38.tsv.gz and its index
-    //
-    // A remote release is fetched with wget rather than staged as a path input, because neither
-    // release host can be staged by Nextflow: REVEL's answers 403 to a request carrying no
-    // User-Agent, and EVE's redirects HTTPS to HTTP, which Nextflow refuses to follow.
+    // A remote release goes through wget: REVEL's host answers 403 to a request carrying no
+    // User-Agent and EVE's redirects HTTPS to HTTP, so neither can be staged as a path input
     //
     if (prepare.containsKey('vep_revel')) {
         if (prepare['vep_revel'].toString().contains('://')) {
@@ -89,9 +84,8 @@ workflow PREPARE_VEP_PLUGINS {
         ch_versions = ch_versions.mix(UNZIP_EVE.out.versions)
     }
 
-    // One list of every plugin file, read by both the germline and the somatic VEP task, so it has
-    // to be a value channel. collect() gives one but emits nothing on an empty upstream, so the
-    // ifEmpty is what carries the no-plugins case.
+    // A value channel, since both the germline and the somatic VEP task read it. collect() emits
+    // nothing on an empty upstream, so ifEmpty is what carries the no-plugins case.
     ch_extra_files = staged
         .inject(channel.empty()) { acc, ch -> acc.mix(ch) }
         .flatten()

@@ -219,25 +219,25 @@
                     "type": "string",
                     "description": "Path or URL to the AlphaMissense GRCh38 score file for the AlphaMissense plugin.",
                     "fa_icon": "fas fa-file",
-                    "help_text": "Defaults to AlphaMissense_hg38.tsv.gz from https://storage.googleapis.com/dm_alphamissense on --genome GRCh38, which the pipeline downloads (613 MB) and indexes for you, since the release ships without a .tbi. Supply this together with --vep_alphamissense_tbi to use a copy you have already indexed and skip both steps. GRCh38 only; on CHM13 the route is --vep_alphamissense_aa. Licensed CC BY 4.0."
+                    "help_text": "Defaults to AlphaMissense_hg38.tsv.gz (613 MB) from https://storage.googleapis.com/dm_alphamissense on --genome GRCh38, fetched with an index we host since the release ships without a .tbi. Supply this together with --vep_alphamissense_tbi to use a local copy instead. GRCh38 only; on CHM13 the route is --vep_alphamissense_aa. Licensed CC BY 4.0."
                 },
                 "vep_alphamissense_tbi": {
                     "type": "string",
                     "description": "Path or URL to the index for --vep_alphamissense.",
                     "fa_icon": "fas fa-file",
-                    "help_text": "Optional. Leaving it unset is what tells the pipeline to index the score file itself."
+                    "help_text": "Required whenever --vep_alphamissense is set. Overriding the score file drops the default index, which was built from different content."
                 },
                 "vep_alphamissense_aa": {
                     "type": "string",
                     "description": "Path or URL to a protein-space AlphaMissense table for the AlphaMissenseProtein plugin (CHM13).",
                     "fa_icon": "fas fa-file",
-                    "help_text": "Defaults to AlphaMissense_aa_substitutions.tsv.gz from https://storage.googleapis.com/dm_alphamissense on --genome CHM13, which the pipeline downloads (1.1 GB) and re-keys onto gene symbols with bin/build_alphamissense_protein_table.sh. The result is keyed on gene symbol and amino-acid substitution, so it is assembly-independent and is the route to AlphaMissense scores on CHM13. Supply this with --vep_alphamissense_aa_tbi to use a table you have already built."
+                    "help_text": "Defaults on --genome CHM13 to a table we host (1.1 GB, indexed), built from the AlphaMissense protein-space release by re-keying UniProt accessions onto gene symbols -- see CITATIONS.md. Keyed on gene symbol and amino-acid substitution, so it is assembly-independent, which is what makes AlphaMissense reachable on CHM13. Supply this with --vep_alphamissense_aa_tbi to use a table of your own."
                 },
                 "vep_alphamissense_aa_tbi": {
                     "type": "string",
                     "description": "Path or URL to the index for --vep_alphamissense_aa.",
                     "fa_icon": "fas fa-file",
-                    "help_text": "Optional. Leaving it unset is what tells the pipeline to build the protein-space table itself."
+                    "help_text": "Required whenever --vep_alphamissense_aa is set. Overriding the table drops the default index, which was built from different content."
                 },
                 "vep_polyphen_sift_db": {
                     "type": "string",

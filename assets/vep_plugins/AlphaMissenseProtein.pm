@@ -53,9 +53,9 @@ limitations under the License.
  CHM13 run can use them directly with no liftover of variants or of the
  annotation anywhere in the pipeline.
 
- The lookup table is built once by bin/build_alphamissense_protein_table.sh from
- the AlphaMissense_aa_substitutions.tsv.gz release, which is already keyed by
- UniProt accession and amino-acid substitution. It is indexed with
+ The lookup table is the AlphaMissense protein-space release re-keyed from
+ UniProt accession onto gene symbol; the pipeline fetches it ready-built (see
+ CITATIONS.md for how it was derived). It is indexed with
  `tabix -s 1 -b 2 -e 2` -- tabix's "sequence" column is just a string, which is
  what lets a protein-space table be range-queried at all.
 

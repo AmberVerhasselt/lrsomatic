@@ -1,31 +1,18 @@
 #!/usr/bin/env bash
 #
-# Preparation of VEP plugin data files.
+# Reshape the VEP plugin releases that cannot be handed to VEP as published:
+# REVEL ships comma-separated and sorted on its GRCh37 column, and EVE ships as
+# thousands of per-protein VCFs. Every other resource needs no preparation.
 #
-# REVEL and EVE cannot be handed to VEP as published: REVEL ships
-# comma-separated and sorted on its GRCh37 column, and EVE ships as thousands of
-# per-protein VCFs.
-#
-# The pipeline calls this script itself, from modules/local/vepplugin/*, so a
-# default run needs no manual preparation. Run it by hand to produce files you
-# can then pass to --vep_revel / --vep_eve, which skips both the download and
-# the prep task on every subsequent run.
-#
-# Nothing is redistributed: the inputs are fetched from their original source
-# and the outputs stay on your filesystem. See docs/usage.md for the download
-# URLs and the licence terms of each resource -- CADD, REVEL and EVE are free
-# for non-commercial use only, and observing that is the user's responsibility.
+# The pipeline runs this itself from modules/local/vepplugin/*, so a default run
+# needs no manual step. Run it by hand to produce files to pass to --vep_revel /
+# --vep_eve, which skips the download and the prep task on later runs.
 #
 # Usage:
 #   bin/prepare_vep_plugin_data.sh revel <zip-or-unpacked-dir> <outdir>
 #   bin/prepare_vep_plugin_data.sh eve <eve-vcf-dir> <outdir>
 #
-# Every other resource needs no preparation: ClinVar and CADD ship their own
-# .tbi, the pangenome PolyPhen/SIFT file is an SQLite database, and the two
-# AlphaMissense tables are fetched already indexed.
-#
-# Requires: bgzip and tabix (htslib), awk, sort, and unzip when REVEL is given
-# the release zip rather than an already-unpacked directory.
+# Requires: bgzip and tabix (htslib), awk, sort, and unzip for the REVEL zip.
 
 set -euo pipefail
 
@@ -38,7 +25,7 @@ need() {
 }
 
 usage() {
-    sed -n '2,28p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
+    sed -n '2,16p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
     exit "${1:-1}"
 }
 
@@ -55,8 +42,7 @@ prep_revel() {
     work=$(mktemp -d "${TMPDIR:-/tmp}/revel.XXXXXX")
     trap 'rm -rf "$work"' RETURN
 
-    # Either the release zip or a directory it has already been unpacked into,
-    # so the pipeline can leave the unpacking to a container that has unzip.
+    # Either the release zip or a directory it has already been unpacked into
     local searchdir=$src
     if [[ -f $src ]]; then
         need unzip

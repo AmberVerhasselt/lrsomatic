@@ -20,8 +20,7 @@ process VEPPLUGIN_EVE {
     script:
     def args = task.ext.args ?: ''
     """
-    # Thousands of per-protein VCFs merged into one sorted file, which needs
-    # scratch space rather than /tmp.
+    # Merging thousands of per-protein VCFs needs scratch space rather than /tmp
     export TMPDIR=\${TMPDIR:-\$PWD}
 
     prepare_vep_plugin_data.sh eve ${eve_dir} . ${args}
