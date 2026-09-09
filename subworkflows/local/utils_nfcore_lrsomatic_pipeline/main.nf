@@ -353,6 +353,17 @@ def vepPluginResource(name) {
 }
 
 //
+// The target assembly: an explicit --vep_genome wins, else the per-assembly default
+//
+// Resolved rather than read off params.vep_genome, which workflows/lrsomatic.nf assigns at
+// runtime: an included module keeps its own params binding, so that write is never visible here
+//
+def vepTargetGenome() {
+    def explicit = params.containsKey('vep_genome') ? params.vep_genome : null
+    return explicit ?: getGenomeAttribute('vep_genome')
+}
+
+//
 // True when no plugin annotation should happen at all
 //
 def vepPluginsSkipped() {
@@ -439,7 +450,9 @@ def validateVepPluginParams() {
         'vep_eve'          : 'EVE is published for GRCh38 only.'
     ]
 
-    if (params.vep_genome == 'T2T-CHM13v2.0') {
+    def vep_genome = vepTargetGenome()
+
+    if (vep_genome == 'T2T-CHM13v2.0') {
         grch38_only.each { data_param, advice ->
             if (vepPluginResource(data_param)) {
                 error("--${data_param}: a GRCh38-only resource, which cannot be used with --vep_genome T2T-CHM13v2.0. ${advice}")
@@ -447,7 +460,7 @@ def validateVepPluginParams() {
         }
     }
     else if (vepPluginResource('vep_alphamissense_aa')) {
-        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. On ${params.vep_genome} use --vep_alphamissense instead.")
+        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. On ${vep_genome} use --vep_alphamissense instead.")
     }
 }
 
