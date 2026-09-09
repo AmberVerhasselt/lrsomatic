@@ -136,13 +136,19 @@
 
 - [AlphaMissense Database](https://console.cloud.google.com/storage/browser/dm_alphamissense)
 
-  VEP plugin data, fetched from this bucket by default via `--vep_alphamissense` (GRCh38) or
+  VEP plugin data, fetched by default via `--vep_alphamissense` (GRCh38) or
   `--vep_alphamissense_aa` (CHM13). AlphaMissense Database, Copyright (2023) DeepMind Technologies
-  Limited, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
-  `bin/build_alphamissense_protein_table.sh` produces an adapted version of this data: the released
-  values are re-keyed from UniProt accession to gene symbol and reshaped into a tabix-indexed lookup
-  table, with no score altered. Provided for theoretical modelling only, and not a substitute for
-  professional medical advice, diagnosis or treatment.
+  Limited, licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode). Provided for
+  theoretical modelling only, and not a substitute for professional medical advice, diagnosis or
+  treatment.
+
+  On GRCh38 the score file comes from the bucket unchanged, with a tabix index we host because the
+  release ships without one. On CHM13 the pipeline distributes **an adaptation** of this data: the
+  protein-space release re-keyed from UniProt accession to gene symbol using the UniProt ID mapping,
+  split into reference/position/alternate amino-acid columns, deduplicated where several accessions
+  share a symbol, and tabix-indexed. Rows whose accession has no gene symbol are dropped. **No score
+  is altered.** CC BY 4.0 permits this adaptation and its redistribution with attribution and, as
+  given here, an indication of the changes made.
 
 - [Ensembl pangenome PolyPhen/SIFT database](https://ftp.ensembl.org/pub/current_variation/pangenomes/Human/)
 
@@ -152,8 +158,8 @@
 
 - [UniProt ID mapping](https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/)
 
-  Used by `bin/build_alphamissense_protein_table.sh` to map UniProt accessions to gene symbols, and
-  so fetched by default on `--genome CHM13` via `--vep_uniprot_idmapping`. UniProtKB is licensed
+  The source of the gene symbols in the protein-space AlphaMissense table above. Not fetched at
+  runtime: it is an input to the table the pipeline distributes. UniProtKB is licensed
   [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
 
 - [ASAP Panel of Normals](https://www.biorxiv.org/content/10.64898/2026.03.15.711881v1)

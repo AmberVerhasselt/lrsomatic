@@ -311,13 +311,6 @@
                     "description": "Path or URL to the index for --vep_eve.",
                     "fa_icon": "fas fa-file",
                     "help_text": "Required when --vep_eve points at an already-merged VCF, and unused when it points at the release zip."
-                },
-                "vep_uniprot_idmapping": {
-                    "type": "string",
-                    "description": "Path or URL to the UniProt human ID mapping, used to build the protein-space AlphaMissense table.",
-                    "fa_icon": "fas fa-file",
-                    "default": "https://ftp.uniprot.org/pub/databases/uniprot/current_release/knowledgebase/idmapping/by_organism/HUMAN_9606_idmapping.dat.gz",
-                    "help_text": "Only read when the AlphaMissenseProtein table is being built, which is on CHM13 unless --vep_alphamissense_aa_tbi is supplied. Passed to the build script rather than downloaded by it, so the task needs no network access and Nextflow caches the file. Licensed CC BY 4.0."
                 }
             }
         },

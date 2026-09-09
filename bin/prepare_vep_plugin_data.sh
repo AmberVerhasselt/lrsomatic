@@ -2,14 +2,14 @@
 #
 # Preparation of VEP plugin data files.
 #
-# AlphaMissense, REVEL and EVE cannot be handed to VEP exactly as published:
-# AlphaMissense needs a tabix index, REVEL ships comma-separated and sorted on
-# its GRCh37 column, and EVE ships as thousands of per-protein VCFs.
+# REVEL and EVE cannot be handed to VEP as published: REVEL ships
+# comma-separated and sorted on its GRCh37 column, and EVE ships as thousands of
+# per-protein VCFs.
 #
 # The pipeline calls this script itself, from modules/local/vepplugin/*, so a
 # default run needs no manual preparation. Run it by hand to produce files you
-# can then pass to --vep_alphamissense / --vep_revel / --vep_eve, which skips
-# both the download and the prep task on every subsequent run.
+# can then pass to --vep_revel / --vep_eve, which skips both the download and
+# the prep task on every subsequent run.
 #
 # Nothing is redistributed: the inputs are fetched from their original source
 # and the outputs stay on your filesystem. See docs/usage.md for the download
@@ -17,13 +17,12 @@
 # for non-commercial use only, and observing that is the user's responsibility.
 #
 # Usage:
-#   bin/prepare_vep_plugin_data.sh alphamissense AlphaMissense_hg38.tsv.gz
 #   bin/prepare_vep_plugin_data.sh revel <zip-or-unpacked-dir> <outdir>
 #   bin/prepare_vep_plugin_data.sh eve <eve-vcf-dir> <outdir>
 #
-# ClinVar, CADD and the Ensembl pangenome PolyPhen/SIFT database need no
-# preparation: ClinVar and CADD ship their own .tbi, and the pangenome file is
-# an SQLite database.
+# Every other resource needs no preparation: ClinVar and CADD ship their own
+# .tbi, the pangenome PolyPhen/SIFT file is an SQLite database, and the two
+# AlphaMissense tables are fetched already indexed.
 #
 # Requires: bgzip and tabix (htslib), awk, sort, and unzip when REVEL is given
 # the release zip rather than an already-unpacked directory.
@@ -39,35 +38,8 @@ need() {
 }
 
 usage() {
-    sed -n '2,29p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
+    sed -n '2,28p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
     exit "${1:-1}"
-}
-
-# AlphaMissense needs only an index. Count the leading non-data lines rather than hardcoding -S 1:
-# tabix applies -S before comment detection, so a wrong count silently parses the header row as data.
-prep_alphamissense() {
-    local tsv=${1:-}
-    [[ -n $tsv ]] || die "usage: $0 alphamissense <AlphaMissense_hg38.tsv.gz>"
-    [[ -r $tsv ]] || die "cannot read $tsv"
-    need bgzip tabix
-
-    local skip
-    # `|| true` because awk exits at the first data line, so gzip takes a SIGPIPE that
-    # pipefail would otherwise turn into a silent abort of the whole script.
-    skip=$( { gzip -dc "$tsv" || true; } | awk -F'\t' '
-        $2 ~ /^[0-9]+$/ { print NR - 1; found = 1; exit }
-        NR > 100        { exit }
-        END             { if (!found) print "NONE" }
-    ')
-    [[ $skip != "NONE" && -n $skip ]] \
-        || die "found no data line in the first 100 lines of $tsv; is this an AlphaMissense coordinate file?"
-    echo ">> indexing $tsv (skipping $skip header line(s))" >&2
-
-    tabix -s 1 -b 2 -e 2 -f -S "$skip" "$tsv"
-    echo ">> wrote $tsv.tbi" >&2
-    echo >&2
-    echo "Pass these to the pipeline with:" >&2
-    echo "  --vep_alphamissense $tsv --vep_alphamissense_tbi $tsv.tbi" >&2
 }
 
 # REVEL ships comma-separated, sorted on its GRCh37 column (2); GRCh38 (column 3) needs a re-sort and its own index.
@@ -159,10 +131,9 @@ prep_eve() {
 }
 
 case "${1:-}" in
-    alphamissense) shift; prep_alphamissense "$@" ;;
     revel)         shift; prep_revel "$@" ;;
     eve)           shift; prep_eve "$@" ;;
     -h|--help|help) usage 0 ;;
     "")            die "no resource given. Try: $0 --help" ;;
-    *)             die "unknown resource '$1'. Expected alphamissense, revel or eve." ;;
+    *)             die "unknown resource '$1'. Expected revel or eve." ;;
 esac

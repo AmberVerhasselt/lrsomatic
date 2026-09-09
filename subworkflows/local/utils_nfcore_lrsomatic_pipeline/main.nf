@@ -378,34 +378,37 @@ def vepPluginIndexParams() {
 }
 
 //
-// Whether a resource still has to be reshaped before VEP can read it: AlphaMissense ships without an index, REVEL and EVE as zips
+// The index for a plugin data file, or null when there is none to use
+//
+// An index default only belongs to the data file it was published beside, so overriding the data
+// file drops it: pairing a user's score file with the default index silently points tabix at an
+// index built for different content.
+//
+def vepPluginIndex(data_param) {
+    def index_param = vepPluginIndexParams()[data_param]
+    if (!index_param) {
+        return null
+    }
+    return params[index_param] ?: (params[data_param] ? null : getGenomeAttribute(index_param))
+}
+
+//
+// Whether a resource still has to be reshaped before VEP can read it, which is the case only for the releases that ship as a zip
 //
 def vepPluginNeedsPrep(data_param) {
     def value = vepPluginResource(data_param)
-    if (!value) {
-        return false
-    }
-    if (['vep_revel', 'vep_eve'].contains(data_param)) {
-        return value.toString().toLowerCase().endsWith('.zip')
-    }
-    if (['vep_alphamissense', 'vep_alphamissense_aa'].contains(data_param)) {
-        return !vepPluginResource(vepPluginIndexParams()[data_param])
-    }
-    return false
+    return value \
+        && ['vep_revel', 'vep_eve'].contains(data_param) \
+        && value.toString().toLowerCase().endsWith('.zip')
 }
 
 //
 // The filename a prep task writes, which is what the VEP argument references since plugin files are staged into the task root
 //
 def vepPluginPreparedName(data_param) {
-    // AlphaMissense is indexed where it lies, so it keeps its published name
-    if (data_param == 'vep_alphamissense') {
-        return file(vepPluginResource(data_param)).name
-    }
     return [
-        'vep_alphamissense_aa': 'alphamissense_protein.tsv.gz',
-        'vep_revel'           : 'revel_grch38.tsv.gz',
-        'vep_eve'             : 'eve_merged.vcf.gz'
+        'vep_revel': 'revel_grch38.tsv.gz',
+        'vep_eve'  : 'eve_merged.vcf.gz'
     ][data_param]
 }
 
@@ -418,15 +421,17 @@ def validateVepPluginParams() {
     }
 
     def index_advice = [
-        'vep_clinvar'   : 'ClinVar publishes a .tbi alongside every VCF.',
-        'vep_cadd_snv'  : 'CADD publishes a .tbi alongside every score file.',
-        'vep_cadd_indel': 'CADD publishes a .tbi alongside every score file.',
-        'vep_revel'     : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip to have both prepared.',
-        'vep_eve'       : 'Either supply the index, or pass the published EVE_all_data.zip to have both prepared.'
+        'vep_clinvar'         : 'ClinVar publishes a .tbi alongside every VCF.',
+        'vep_cadd_snv'        : 'CADD publishes a .tbi alongside every score file.',
+        'vep_cadd_indel'      : 'CADD publishes a .tbi alongside every score file.',
+        'vep_alphamissense'   : 'The release ships without an index; index it with `tabix -s 1 -b 2 -e 2 -S <leading non-data lines>`, or drop both to take the pre-indexed default.',
+        'vep_alphamissense_aa': 'Index the table with `tabix -s 1 -b 2 -e 2 -c "#"`, or drop both to take the prepared default.',
+        'vep_revel'           : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip to have both prepared.',
+        'vep_eve'             : 'Either supply the index, or pass the published EVE_all_data.zip to have both prepared.'
     ]
 
     vepPluginIndexParams().each { data_param, index_param ->
-        if (index_param && vepPluginResource(data_param) && !vepPluginNeedsPrep(data_param) && !vepPluginResource(index_param)) {
+        if (index_param && vepPluginResource(data_param) && !vepPluginNeedsPrep(data_param) && !vepPluginIndex(data_param)) {
             error("--${data_param}: set without --${index_param}. ${index_advice[data_param] ?: 'Both are required.'}")
         }
     }
@@ -454,11 +459,12 @@ def validateVepPluginParams() {
 //
 // Register an already-usable plugin file and its index on `staged`, returning the basename VEP should reference
 //
-def stageVepPluginFile(staged, data_param, index_param) {
+def stageVepPluginFile(staged, data_param) {
     def data_file = file(vepPluginResource(data_param), checkIfExists: true)
     staged << data_file
-    if (index_param && vepPluginResource(index_param)) {
-        staged << file(vepPluginResource(index_param), checkIfExists: true)
+    def index = vepPluginIndex(data_param)
+    if (index) {
+        staged << file(index, checkIfExists: true)
     }
     return data_file.name
 }
@@ -475,7 +481,7 @@ def registerVepPlugin(staged, prepare, data_param) {
         prepare[data_param] = vepPluginResource(data_param)
         return vepPluginPreparedName(data_param)
     }
-    return stageVepPluginFile(staged, data_param, vepPluginIndexParams()[data_param])
+    return stageVepPluginFile(staged, data_param)
 }
 
 //
