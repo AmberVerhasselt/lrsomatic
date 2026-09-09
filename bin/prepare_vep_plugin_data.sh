@@ -48,8 +48,10 @@ prep_revel() {
         die "$src is neither a zip file nor a directory"
     fi
 
+    # -L because the pipeline passes a Nextflow-staged directory, which is a symlink;
+    # plain find reports it and never descends.
     local raw
-    raw=$(find "$searchdir" -name 'revel_with_transcript_ids' -o -name 'revel_all_chromosomes.csv' | head -n1)
+    raw=$(find -L "$searchdir" -name 'revel_with_transcript_ids' -o -name 'revel_all_chromosomes.csv' | head -n1)
     [[ -n $raw ]] || die "could not find the REVEL table in $src"
     echo "   using $(basename "$raw")" >&2
 
@@ -89,18 +91,20 @@ prep_eve() {
         src="$vcfdir/vcf_files_missense_mutations"
     fi
 
+    # -L throughout because the pipeline passes a Nextflow-staged directory, which is a
+    # symlink; plain find reports it and never descends.
     local count
-    count=$(find "$src" -name '*.vcf' | wc -l)
+    count=$(find -L "$src" -name '*.vcf' | wc -l)
     [[ $count -gt 0 ]] || die "no .vcf files found under $src"
     echo ">> merging $count per-protein VCFs from $src" >&2
 
     local first
-    first=$(find "$src" -name '*.vcf' | sort | head -n1)
+    first=$(find -L "$src" -name '*.vcf' | sort | head -n1)
 
     local out="$outdir/eve_merged.vcf.gz"
     {
         grep '^#' "$first"
-        find "$src" -name '*.vcf' -exec grep -hv '^#' {} + \
+        find -L "$src" -name '*.vcf' -exec grep -hv '^#' {} + \
           | sort -T "$work" -k1,1V -k2,2n
     } | bgzip -c > "$out"
 
