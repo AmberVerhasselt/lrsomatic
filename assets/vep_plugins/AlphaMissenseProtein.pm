@@ -28,67 +28,44 @@ limitations under the License.
 
  # default columns: am_pathogenicity and am_class
  ./vep -i variants.vcf --dir_plugins . \
-   --plugin AlphaMissenseProtein,file=/path/to/alphamissense_protein.tsv.gz
+   --plugin AlphaMissenseProtein,file=/path/to/table.tsv.gz
 
- # pick columns explicitly. VEP splits plugin parameters on commas, so the
+ # pick columns, or cols=all. VEP splits plugin parameters on commas, so the
  # column list is '&' separated
  ./vep -i variants.vcf --dir_plugins . \
    --plugin AlphaMissenseProtein,file=/path/to/table.tsv.gz,cols=am_class&uniprot_acc
 
- # everything the table carries
- ./vep -i variants.vcf --dir_plugins . \
-   --plugin AlphaMissenseProtein,file=/path/to/table.tsv.gz,cols=all
-
 =head1 DESCRIPTION
 
  Annotates amino-acid-changing variants with AlphaMissense pathogenicity values
- looked up in PROTEIN space rather than genomic space.
+ looked up in PROTEIN space rather than genomic space, which is what makes them
+ reachable on T2T-CHM13. AlphaMissense is published in GRCh37/GRCh38 coordinates
+ only, but the score is a function of (protein sequence, amino-acid
+ substitution), so keyed on gene symbol and substitution it is
+ assembly-independent and needs no liftover.
 
- Why this exists: AlphaMissense is published in GRCh37 and GRCh38 coordinates
- only, and the stock AlphaMissense plugin is therefore unusable against the
- T2T-CHM13 cache. But AlphaMissense is a protein-sequence predictor -- the score
- is a function of (protein sequence, amino-acid substitution) and carries no
- genome coordinate at all. Keyed on (gene symbol, amino-acid position, reference
- amino acid, alternate amino acid) the values are assembly-independent, so a
- CHM13 run can use them directly with no liftover of variants or of the
- annotation anywhere in the pipeline.
+ The table is that release re-keyed from UniProt accession onto gene symbol,
+ indexed with `tabix -s 1 -b 2 -e 2` -- tabix's "sequence" column is just a
+ string, which is what lets a protein-space table be range-queried at all. See
+ CITATIONS.md for how it was derived.
 
- The lookup table is the AlphaMissense protein-space release re-keyed from
- UniProt accession onto gene symbol; the pipeline fetches it ready-built (see
- CITATIONS.md for how it was derived). It is indexed with
- `tabix -s 1 -b 2 -e 2` -- tabix's "sequence" column is just a string, which is
- what lets a protein-space table be range-queried at all.
-
- CORRECTNESS GUARD: a row is used only when its reference amino acid AND its
- alternate amino acid both equal what VEP computed for the transcript at hand.
- Where the CHM13 protein differs from the GRCh38 protein the AlphaMissense
- numbering was derived against -- a differently numbered isoform, a paralog
- resolved differently, newly corrected sequence -- the reference amino acid
- disagrees and the plugin returns no score rather than a score for the wrong
- substitution. It fails closed, never silently wrong.
-
- Every result carries AlphaMissenseProtein_match saying what happened:
+ A row is used only when both its reference and its alternate amino acid equal
+ what VEP computed for the transcript at hand, so where the CHM13 protein
+ differs from the GRCh38 one it returns no score rather than a score for the
+ wrong substitution. AlphaMissenseProtein_match reports which happened:
    gene_aa      - matched on gene symbol and amino-acid substitution
    aa_mismatch  - the gene and position exist but no row has this substitution
    not_found    - the gene symbol and position are absent from the table
    no_gene      - VEP produced no gene symbol for this transcript
 
  Requires --symbol (implied by --everything), since the join key is the gene
- symbol; CHM13 rapid-release stable IDs are unrelated to GRCh38 Ensembl IDs and
- cannot be used for this.
+ symbol.
 
- ATTRIBUTION: the underlying data is the AlphaMissense Database, Copyright (2023)
- DeepMind Technologies Limited, licensed CC BY 4.0
- (https://creativecommons.org/licenses/by/4.0/legalcode). CHANGES WERE MADE: the
- released values were re-keyed from UniProt accession to gene symbol and
- reshaped into a tabix-indexed lookup table. No values were altered.
-
- Please cite the AlphaMissense publication alongside Ensembl VEP if you use this
- resource: https://doi.org/10.1126/science.adg7492
-
- Disclaimer: AlphaMissense is provided for theoretical modelling only. It is not
- intended as a substitute for professional medical advice, diagnosis or
- treatment.
+ ATTRIBUTION: the data is the AlphaMissense Database, Copyright (2023) DeepMind
+ Technologies Limited, licensed CC BY 4.0. CHANGES WERE MADE: re-keyed from
+ UniProt accession to gene symbol and reshaped into a tabix-indexed table, with
+ no value altered. Provided for theoretical modelling only, not as a substitute
+ for professional medical advice. Cite https://doi.org/10.1126/science.adg7492.
 
 =cut
 

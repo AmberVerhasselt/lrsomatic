@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
 #
-# Reshape the VEP plugin releases that cannot be handed to VEP as published:
-# REVEL ships comma-separated and sorted on its GRCh37 column, and EVE ships as
-# thousands of per-protein VCFs. Every other resource needs no preparation.
-#
-# The pipeline runs this itself from modules/local/vepplugin/*, so a default run
-# needs no manual step. Run it by hand to produce files to pass to --vep_revel /
-# --vep_eve, which skips the download and the prep task on later runs.
+# Reshape the REVEL and EVE releases into the form VEP expects. The pipeline runs
+# this itself; run it by hand to pre-build files for --vep_revel / --vep_eve.
 #
 # Usage:
 #   bin/prepare_vep_plugin_data.sh revel <zip-or-unpacked-dir> <outdir>
@@ -25,7 +20,7 @@ need() {
 }
 
 usage() {
-    sed -n '2,16p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
+    sed -n '2,10p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'
     exit "${1:-1}"
 }
 
