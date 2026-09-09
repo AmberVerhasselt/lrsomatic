@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### `Added`
 
+- [#190](https://github.com/IntGenomicsLab/lrsomatic/pull/190) - Added mutational signature analysis: SigProfilerMatrixGenerator matrices (SBS/DBS/ID) and per-sample COSMIC signature fitting with SigProfilerAssignment on the phased somatic VCF, with CHM13-T2T support via a purpose-built image (`ghcr.io/ljwharbers/sigprofiler`) and CHM13-renormalised COSMIC signatures; new `--sigprofiler_*` / `--download_sigprofiler_genome` / `--skip_signatures` parameters (@ljwharbers).
 - [#176](https://github.com/IntGenomicsLab/lrsomatic/pull/176) - Added `LRSOMATICREPORT` as the final pipeline step: a self-contained per-sample HTML report covering small variants, structural variants, copy number and QC. Skip it with `--skip_report`; choose the gene panel selected on load with `--report_gene_panel` (@ljwharbers).
 - [#176](https://github.com/IntGenomicsLab/lrsomatic/pull/176) - Vendored the [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report) v1.3.2 tool source at `assets/lrsomatic_report`, so `nextflow run IntGenomicsLab/lrsomatic` ships it without a submodule checkout (@ljwharbers).
 - [#176](https://github.com/IntGenomicsLab/lrsomatic/pull/176) - Added a `solution_dirs` output to the WAKHAN module so its per-solution copy-number plots can be staged downstream (@ljwharbers).
