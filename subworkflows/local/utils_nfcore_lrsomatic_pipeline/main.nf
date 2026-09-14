@@ -399,13 +399,18 @@ def vepPluginIndex(data_param) {
 }
 
 //
-// Whether a resource still has to be reshaped before VEP can read it, true only for a release zip
+// Whether a resource still has to be reshaped before VEP can read it
+//
+// Only REVEL and EVE are ever prepared, and the test is for what a prepared file looks like --
+// bgzipped, so revel_grch38.tsv.gz or eve_merged.vcf.gz -- rather than for a release zip. EVE's
+// documented download endpoint ends in a bare '/', so keying on '.zip' would take that URL for a
+// finished file and then demand an index for it that cannot exist.
 //
 def vepPluginNeedsPrep(data_param) {
     def value = vepPluginResource(data_param)
-    return value \
-        && ['vep_revel', 'vep_eve'].contains(data_param) \
-        && value.toString().toLowerCase().endsWith('.zip')
+    return value &&
+        ['vep_revel', 'vep_eve'].contains(data_param) &&
+        !value.toString().toLowerCase().endsWith('.gz')
 }
 
 //
@@ -433,12 +438,16 @@ def validateVepPluginParams() {
         'vep_alphamissense'   : 'The release ships without an index; index it with `tabix -s 1 -b 2 -e 2 -S <leading non-data lines>`, or drop both to take the pre-indexed default.',
         'vep_alphamissense_aa': 'Index the table with `tabix -s 1 -b 2 -e 2 -c "#"`, or drop both to take the prepared default.',
         'vep_revel'           : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip to have both prepared.',
-        'vep_eve'             : 'Either supply the index, or pass the published EVE_all_data.zip to have both prepared.'
+        'vep_eve'             : 'Either supply the index, or pass the release -- https://evemodel.org/api/proteins/bulk/download/, or the zip it serves -- to have both prepared.'
     ]
 
     vepPluginIndexParams().each { data_param, index_param ->
         if (index_param && vepPluginResource(data_param) && !vepPluginNeedsPrep(data_param) && !vepPluginIndex(data_param)) {
             error("--${data_param}: set without --${index_param}. ${index_advice[data_param] ?: 'Both are required.'}")
+        }
+        // What the prep task writes is indexed from that output, so a supplied index cannot apply
+        if (index_param && params[index_param] && vepPluginNeedsPrep(data_param)) {
+            error("--${index_param}: cannot be combined with --${data_param} '${vepPluginResource(data_param)}', which the pipeline reshapes itself and indexes from the file it writes. Drop --${index_param}, or pass an already-prepared .gz as --${data_param}.")
         }
     }
 
@@ -460,7 +469,17 @@ def validateVepPluginParams() {
         }
     }
     else if (vepPluginResource('vep_alphamissense_aa')) {
-        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. On ${vep_genome} use --vep_alphamissense instead.")
+        // vep_genome is null for a custom reference carrying no --genome
+        def target = vep_genome ? "On ${vep_genome} use" : 'Use'
+        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. ${target} --vep_alphamissense instead.")
+    }
+
+    // The VEP module rewrites the first '--custom file=' in ext.args to the staged --vep_custom file.
+    // ext.args is vep_args plus the plugin args, so a user with no '--custom file=' of their own would
+    // have the ClinVar entry rewritten instead -- their VCF annotated under ClinVar's short_name and
+    // fields, with ClinVar itself silently gone.
+    if (params.vep_custom && !(params.vep_args =~ /--custom file=/)) {
+        error("--vep_custom: needs a matching '--custom file=...' entry in --vep_args, which is where the staged file is substituted in. Add one, e.g. --vep_args '${params.vep_args} --custom file=placeholder,short_name=MyTrack,format=vcf,type=exact,coords=0'.")
     }
 }
 
