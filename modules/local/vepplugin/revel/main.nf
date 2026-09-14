@@ -20,8 +20,10 @@ process VEPPLUGIN_REVEL {
     script:
     def args = task.ext.args ?: ''
     """
-    # The re-sort onto the GRCh38 column needs scratch space rather than /tmp
-    export TMPDIR=\${TMPDIR:-\$PWD}
+    # The re-sort onto the GRCh38 column needs scratch space rather than /tmp. The task
+    # directory is already on scratch, and an inherited TMPDIR need not be bound inside
+    # the container, so point at it unconditionally rather than deferring to the host.
+    export TMPDIR=\$PWD
 
     prepare_vep_plugin_data.sh revel ${revel_dir} . ${args}
     """

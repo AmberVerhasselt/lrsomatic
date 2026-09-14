@@ -207,6 +207,12 @@ sub run {
   my $tv = $tva->transcript_variation;
   return {} unless $tv;
 
+  # AlphaMissense scores missense substitutions only. Stop-gain, start-lost and stop-lost
+  # are single-residue changes too ('A/*', 'M/L' at position 1), so without this they would
+  # reach the aa_mismatch return below and be reported as protein divergence -- which they
+  # are not. The stock REVEL plugin filters the same way.
+  return {} unless grep { $_->SO_term eq 'missense_variant' } @{$tva->get_all_OverlapConsequences};
+
   # A single-residue amino-acid substitution is the only thing this table keys on.
   my $pos = $tv->translation_start;
   my $end = $tv->translation_end;

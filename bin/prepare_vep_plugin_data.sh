@@ -35,7 +35,8 @@ prep_revel() {
     mkdir -p "$outdir"
     local work
     work=$(mktemp -d "${TMPDIR:-/tmp}/revel.XXXXXX")
-    trap 'rm -rf "$work"' RETURN
+    # EXIT rather than RETURN: a RETURN trap does not fire when set -e aborts mid-function
+    trap 'rm -rf "$work"' EXIT
 
     # Either the release zip or a directory it has already been unpacked into
     local searchdir=$src
@@ -83,7 +84,8 @@ prep_eve() {
     mkdir -p "$outdir"
     local work
     work=$(mktemp -d "${TMPDIR:-/tmp}/eve.XXXXXX")
-    trap 'rm -rf "$work"' RETURN
+    # EXIT rather than RETURN: a RETURN trap does not fire when set -e aborts mid-function
+    trap 'rm -rf "$work"' EXIT
 
     # The bulk zip nests the per-protein files under vcf_files_missense_mutations.
     local src=$vcfdir
