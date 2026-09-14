@@ -109,9 +109,12 @@ workflow LRSOMATIC {
     params.sigprofiler_genome = getGenomeAttribute('sigprofiler_genome')
     params.sigprofiler_genome_url = getGenomeAttribute('sigprofiler_genome_url')
 
-    // vep_plugin_args is read back by conf/modules.config
+    // Resolved once and handed to PREPARE_VEP_PLUGINS below, rather than resolved again there:
+    // staging a plugin file checks it exists, which for the default resources is a HEAD request
+    // per URL. vep_plugin_args is read back by conf/modules.config.
     validateVepPluginParams()
-    params.vep_plugin_args = resolveVepPlugins().args
+    vep_plugins = resolveVepPlugins()
+    params.vep_plugin_args = vep_plugins.args
 
     vep_custom = params.vep_custom != null ? file(params.vep_custom) : []
     vep_custom_tbi = params.vep_custom_tbi != null ? file(params.vep_custom_tbi) : []
@@ -730,10 +733,12 @@ workflow LRSOMATIC {
 
         //
         // SUBWORKFLOW: PREPARE_VEP_PLUGINS
-        // Input:  none -- reads the resolved --vep_* configuration itself
+        // Input:  vep_plugins -- the resolved plugin map from resolveVepPlugins()
         // Output: .extra_files -- plugin .pm and data files to stage, empty when none are configured
         //
-        PREPARE_VEP_PLUGINS ()
+        PREPARE_VEP_PLUGINS (
+            vep_plugins
+        )
 
         ch_vep_extra_files = PREPARE_VEP_PLUGINS.out.extra_files
         ch_versions = ch_versions.mix(PREPARE_VEP_PLUGINS.out.versions)

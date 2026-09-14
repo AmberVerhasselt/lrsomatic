@@ -9,14 +9,13 @@ include { WGET as WGET_EVE     } from '../../modules/nf-core/wget/main'
 include { VEPPLUGIN_REVEL      } from '../../modules/local/vepplugin/revel/main.nf'
 include { VEPPLUGIN_EVE        } from '../../modules/local/vepplugin/eve/main.nf'
 
-include { resolveVepPlugins    } from './utils_nfcore_lrsomatic_pipeline'
-
 workflow PREPARE_VEP_PLUGINS {
+
+    take:
+    plugins // map: the resolved plugin configuration from resolveVepPlugins()
 
     main:
 
-    // Resolved here rather than taken as an input: a workflow input would arrive in a channel
-    def plugins = resolveVepPlugins()
     def prepare = plugins.prepare
 
     ch_versions = channel.empty()
