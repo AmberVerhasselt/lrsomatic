@@ -60,7 +60,7 @@ b. Copy number alterion calling; long read version of ([`ASCAT`](https://github.
 
 **4) Annotation:**
 
-a. Small variant annotation ([`VEP`](https://github.com/Ensembl/ensembl-vep))
+a. Small variant annotation ([`VEP`](https://github.com/Ensembl/ensembl-vep)), with pathogenicity and clinical-significance plugins: [`AlphaMissense`](https://github.com/google-deepmind/alphamissense), [`ClinVar`](https://www.ncbi.nlm.nih.gov/clinvar/), [`REVEL`](https://sites.google.com/site/revelgenomics/), [`SIFT`/`PolyPhen`](https://github.com/Ensembl/VEP_plugins), and optionally [`CADD`](https://cadd.gs.washington.edu/) and [`EVE`](https://evemodel.org/)
 
 b. Structural variant annotation ([`VEP`](https://github.com/Ensembl/ensembl-vep))
 

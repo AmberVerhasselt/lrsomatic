@@ -441,6 +441,38 @@ Phased variant calls produced by Longphase. Present in all samples.
 
 </details>
 
+#### Plugin fields in the `CSQ` annotation
+
+The germline and somatic VCFs carry these extra subfields inside VEP's `CSQ` INFO annotation, on
+top of what `--everything` already produces. They are absent from the SV VCF, which is annotated
+without plugins. Read them out with `bcftools +split-vep`. Which appear depends on the assembly and
+on which resources were enabled — see [VEP plugins](usage.md#vep-plugins).
+
+| Field                                                   | Source                 | Appears on                                              |
+| ------------------------------------------------------- | ---------------------- | ------------------------------------------------------- |
+| `am_pathogenicity`, `am_class`                          | `AlphaMissense` plugin | GRCh38                                                  |
+| `AlphaMissenseProtein_match`                            | `AlphaMissenseProtein` | CHM13                                                   |
+| `am_pathogenicity`, `am_class`                          | `AlphaMissenseProtein` | CHM13, when the lookup resolves                         |
+| `SIFT_score`, `SIFT_pred`                               | `PolyPhen_SIFT` plugin | CHM13 (GRCh38 gets `SIFT` from cache)                   |
+| `PolyPhen_humvar_score`, `PolyPhen_humvar_pred`         | `PolyPhen_SIFT` plugin | CHM13, as above                                         |
+| `ClinVar_CLNSIG`, `ClinVar_CLNREVSTAT`, `ClinVar_CLNDN` | ClinVar `--custom`     | both, fields set by `--vep_clinvar_fields`              |
+| `REVEL`                                                 | `REVEL` plugin         | GRCh38                                                  |
+| `CADD_PHRED`, `CADD_RAW`                                | `CADD` plugin          | GRCh38, only with `--vep_cadd_snv` / `--vep_cadd_indel` |
+| `EVE_SCORE`, `EVE_CLASS`                                | `EVE` plugin           | GRCh38, only with `--vep_eve`                           |
+
+`AlphaMissenseProtein_match` records how the CHM13 protein-space lookup resolved, and is the field
+to check before trusting — or explaining — a missing score:
+
+| Value         | Meaning                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gene_aa`     | Matched on gene symbol and both amino acids; `am_pathogenicity` is populated                                                                                                |
+| `aa_mismatch` | The gene and position exist in the table, but the amino acids disagree — the CHM13 protein and the one AlphaMissense was numbered against differ here, so no score is given |
+| `not_found`   | No row for this gene and position                                                                                                                                           |
+| `no_gene`     | VEP produced no gene symbol for the transcript, so no lookup was possible                                                                                                   |
+
+Only missense substitutions are looked up at all; anything else carries no `AlphaMissenseProtein_*`
+field rather than a match value.
+
 ### `signatures`
 
 Mutational signature analysis of the PASS SNVs and indels in the phased somatic VCF: [SigProfilerMatrixGenerator](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator) builds the mutational matrices and [SigProfilerAssignment](https://github.com/SigProfilerSuite/SigProfilerAssignment) fits COSMIC reference signatures to them. For `--genome CHM13` the matrices use the `CHM13-T2T` genome and the SBS/DBS fits use COSMIC signatures renormalised to CHM13; ID83 signatures are not genome-normalised by COSMIC and always use the GRCh37 set. The `DBS78` and `ID83` directories are absent when a sample has no doublet substitutions or indels.

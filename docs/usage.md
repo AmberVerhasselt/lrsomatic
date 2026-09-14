@@ -180,10 +180,12 @@ For structural variants, the CHM13 panel of normals is a merged panel combining 
 
 #### VEP plugin options:
 
-The plugin data is **on by default** on `--genome GRCh38` and `--genome CHM13`: each parameter
-below falls back to a per-assembly default that the pipeline downloads and, where the release needs
-it, reshapes. Setting one overrides that default; `--skip_vep_plugins` turns the whole set off. See
-[VEP plugins](#vep-plugins) for sizes, licence terms and which assembly each applies to.
+The plugin data is **on by default** on `--genome GRCh38` and `--genome CHM13`: most parameters
+below fall back to a per-assembly default that the pipeline downloads and, where the release needs
+it, reshapes. Setting one overrides that default; `--skip_vep_plugins` turns the whole set off. The
+CADD and EVE parameters are the exception — they have no default and do nothing unless set, because
+of their size. See [VEP plugins](#vep-plugins) for sizes, licence terms and which assembly each
+applies to.
 
 | Parameter                    | Description                                                                                                              |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -196,9 +198,9 @@ it, reshapes. Setting one overrides that default; `--skip_vep_plugins` turns the
 | `--vep_clinvar`              | ClinVar VCF, added as a VEP `--custom` annotation                                                                        |
 | `--vep_clinvar_tbi`          | Index for `--vep_clinvar`. Required whenever `--vep_clinvar` is set                                                      |
 | `--vep_clinvar_fields`       | Comma-separated ClinVar INFO fields to carry through. Default = `"CLNSIG,CLNREVSTAT,CLNDN"`                              |
-| `--vep_cadd_snv`             | CADD SNV score file, for the `CADD` plugin. 81 GB — worth overriding with a local path. GRCh38 only                      |
+| `--vep_cadd_snv`             | CADD SNV score file, for the `CADD` plugin. No default — 81 GB, so opt-in; prefer a local path. GRCh38 only              |
 | `--vep_cadd_snv_tbi`         | Index for `--vep_cadd_snv`. Required whenever `--vep_cadd_snv` is set                                                    |
-| `--vep_cadd_indel`           | CADD indel score file, for the `CADD` plugin. GRCh38 only                                                                |
+| `--vep_cadd_indel`           | CADD indel score file, for the `CADD` plugin. No default — opt-in. GRCh38 only                                           |
 | `--vep_cadd_indel_tbi`       | Index for `--vep_cadd_indel`. Required whenever `--vep_cadd_indel` is set                                                |
 | `--vep_revel`                | REVEL release zip, or a prepared score file, for the `REVEL` plugin. GRCh38 only                                         |
 | `--vep_revel_tbi`            | Index for `--vep_revel`. Required only when `--vep_revel` is an already-prepared file                                    |
@@ -412,41 +414,64 @@ published. Nothing has to be prepared by hand first.
 To annotate with VEP alone, pass `--skip_vep_plugins`. The plugins are also off whenever no default
 resolves — under `--igenomes_ignore`, or with a `--genome` other than GRCh38 and CHM13.
 
-The pipeline hosts and redistributes none of this data: every default points at the resource's
-original source. Complying with each licence remains your responsibility, and **CADD, REVEL and EVE
-are free for non-commercial use only** — see the callout at the end of this section.
+Almost every default points at the resource's original source. The two exceptions are the
+AlphaMissense GRCh38 tabix index and the CHM13 protein-space table, both hosted by the lab because
+neither is published in a form VEP can use: AlphaMissense ships its GRCh38 release without an index,
+and the protein-space release is keyed on UniProt accession rather than gene symbol. Both derive
+from AlphaMissense, which is CC BY 4.0 — see `CITATIONS.md` for the attribution and for exactly how
+the table was built. Complying with each licence remains your responsibility, and **CADD, REVEL and
+EVE are free for non-commercial use only** — see the callout at the end of this section.
 
 Plugins are applied to the germline and somatic VEP runs. They are deliberately **not** applied to
 the structural-variant run, since missense and splice scores carry no meaning on SEVERUS breakends.
 
 ### What is enabled by default, per assembly
 
-| Tool              | GRCh38                                   | CHM13                         | Default download                       |
-| ----------------- | ---------------------------------------- | ----------------------------- | -------------------------------------- |
-| **SIFT**          | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | CHM13: 13 GB database                  |
-| **PolyPhen**      | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | as above, the same database            |
-| **AlphaMissense** | `AlphaMissense` plugin                   | `AlphaMissenseProtein` plugin | 613 MB (GRCh38) / 1.1 GB (CHM13)       |
-| **ClinVar**       | `--custom` annotation                    | `--custom`, CHM13-lifted VCF  | 105 MB (GRCh38) / 190 MB (CHM13)       |
-| **CADD**          | `CADD` plugin                            | not available — see below     | 81 GB SNVs + 1.2 GB indels             |
-| **REVEL**         | `REVEL` plugin                           | not available — see below     | 667 MB release zip                     |
-| **EVE**           | `EVE` plugin, opt-in                     | not available — see below     | none — `--vep_eve` enables it (9.6 GB) |
+| Tool              | GRCh38                                   | CHM13                         | Default download                                    |
+| ----------------- | ---------------------------------------- | ----------------------------- | --------------------------------------------------- |
+| **SIFT**          | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | CHM13: 13 GB database                               |
+| **PolyPhen**      | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | as above, the same database                         |
+| **AlphaMissense** | `AlphaMissense` plugin                   | `AlphaMissenseProtein` plugin | 613 MB (GRCh38) / 1.1 GB (CHM13)                    |
+| **ClinVar**       | `--custom` annotation                    | `--custom`, CHM13-lifted VCF  | 105 MB (GRCh38) / 190 MB (CHM13)                    |
+| **CADD**          | `CADD` plugin, opt-in                    | not available — see below     | none — `--vep_cadd_snv` enables it (81 GB + 1.2 GB) |
+| **REVEL**         | `REVEL` plugin                           | not available — see below     | 667 MB release zip                                  |
+| **EVE**           | `EVE` plugin, opt-in                     | not available — see below     | none — `--vep_eve` enables it (9.6 GB)              |
 
-That comes to roughly **83.5 GB on GRCh38** and **14.3 GB on CHM13** for a first run, almost all of
-it CADD and the pangenome database respectively. On GRCh38, SIFT and PolyPhen already come out of
-the VEP cache through the default `--everything`, so `--vep_polyphen_sift_db` is only used on CHM13.
+That comes to roughly **1.4 GB on GRCh38** and **14.3 GB on CHM13** for a first run, the CHM13
+figure being almost entirely the pangenome database. On GRCh38, SIFT and PolyPhen already come out
+of the VEP cache through the default `--everything`, so `--vep_polyphen_sift_db` is only used on
+CHM13.
 
-EVE is the one resource left opt-in: its release is a 9.6 GB zip of per-protein VCFs that then has
-to be merged, which is a lot of work for a predictor AlphaMissense largely covers. Enable it with
-`--vep_eve https://evemodel.org/api/proteins/bulk/download/` (or a path to the zip, or to a VCF you
-have already merged).
+Two resources are left opt-in, both because of their size:
+
+- **CADD** — the SNV table alone is 81 GB, plus 1.2 GB of indels. Nextflow's foreign-file cache is
+  keyed per session rather than per work directory, so every run that is not a `-resume` re-stages
+  the whole thing through the head job, with no resumable download. Enable it with
+  `--vep_cadd_snv <file> --vep_cadd_snv_tbi <file>` and, for indels, `--vep_cadd_indel` with its
+  `_tbi`. Downloading once to local storage and pointing at that is strongly preferable to letting
+  the pipeline fetch it per run.
+- **EVE** — its release is a 9.6 GB zip of per-protein VCFs that then has to be merged, which is a
+  lot of work for a predictor AlphaMissense largely covers. Enable it with
+  `--vep_eve https://evemodel.org/api/proteins/bulk/download/` (or a path to the zip, or to a VCF
+  you have already merged).
 
 ### Downloading and reusing the data
 
-Prepared files are **not** published to `--outdir`. They live in the Nextflow work directory, where
-they are shared by every VEP task in the run and reused by a `-resume` against the same work
-directory — but a fresh work directory downloads and prepares them again. Only REVEL and EVE are
-prepared at all; the two AlphaMissense tables are fetched already indexed, which spares the
-reshaping rather than the download, since the table is about the size of the release it replaces.
+Prepared REVEL and EVE files are published to `<outdir>/vep_plugins/`, alongside their indexes, so
+a later run can point `--vep_revel` / `--vep_revel_tbi` (or the `--vep_eve` pair) at them and skip
+both the download and the reshaping. Only those two are prepared at all; the two AlphaMissense
+tables are fetched already indexed, which spares the reshaping rather than the download, since the
+table is about the size of the release it replaces.
+
+> [!IMPORTANT]
+> `<outdir>/vep_plugins/` holds data that is free for non-commercial use only. Exclude it when you
+> share or archive a results directory — passing it on is redistribution, which those licences do
+> not grant you.
+
+Within a run, downloaded resources are shared by every VEP task. Across runs, it is `-resume` that
+avoids fetching them again, because Nextflow stages remote files into `work/stage-<session-id>/`
+and the session id is what `-resume` preserves. A fresh run in the same work directory gets a new
+session id and downloads everything again.
 
 For repeat runs, download once and pass local paths, which skips both the download and the
 preparation step:
@@ -484,17 +509,17 @@ Whether an index is required depends on the shape of what you supply:
 
 ### Where each default comes from
 
-| Resource                | Source                                                                                                                            | Size   | Prepared by the pipeline                   | Licence                      |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------ | ---------------------------- |
-| AlphaMissense (GRCh38)  | `https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz`, with an index we host                                | 613 MB | no, the index is fetched ready             | CC BY 4.0                    |
-| AlphaMissense (protein) | a gene-symbol-keyed table we host, built from the AlphaMissense protein-space release                                             | 1.1 GB | no, fetched ready — see `CITATIONS.md`     | CC BY 4.0                    |
-| Pangenome PolyPhen/SIFT | `https://ftp.ensembl.org/pub/current_variation/pangenomes/Human/homo_sapiens_pangenome_PolyPhen_SIFT_20240502.db`                 | 13 GB  | no, it is an SQLite database               | Ensembl / EMBL-EBI open      |
-| ClinVar (GRCh38)        | `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/clinvar.vcf.gz` (+ `.tbi`)                                                   | 105 MB | no, `.tbi` is published                    | public domain                |
-| ClinVar (CHM13)         | `clinvar_20240624_GCA_009914755.4.vcf.gz` under `https://ftp.ensembl.org/pub/rapid-release/species/Homo_sapiens/GCA_009914755.4/` | 190 MB | no, `.tbi` is published                    | public domain                |
-| CADD v1.7 SNVs          | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/whole_genome_SNVs.tsv.gz` (+ `.tbi`)                                 | 81 GB  | no, `.tbi` is published                    | free for non-commercial use  |
-| CADD v1.7 indels        | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/gnomad.genomes.r4.0.indel.tsv.gz` (+ `.tbi`)                         | 1.2 GB | no, `.tbi` is published                    | free for non-commercial use  |
-| REVEL v1.3              | `https://rothsj06.dmz.hpc.mssm.edu/revel-v1.3_all_chromosomes.zip`                                                                | 667 MB | unpacked, re-sorted on GRCh38, indexed     | free for non-commercial use  |
-| EVE (opt-in)            | `https://evemodel.org/api/proteins/bulk/download/`                                                                                | 9.6 GB | unpacked, per-protein VCFs merged, indexed | non-commercial; see the site |
+| Resource                  | Source                                                                                                                            | Size   | Prepared by the pipeline                   | Licence                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------ | ---------------------------- |
+| AlphaMissense (GRCh38)    | `https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz`, with an index we host                                | 613 MB | no, the index is fetched ready             | CC BY 4.0                    |
+| AlphaMissense (protein)   | a gene-symbol-keyed table we host, built from the AlphaMissense protein-space release                                             | 1.1 GB | no, fetched ready — see `CITATIONS.md`     | CC BY 4.0                    |
+| Pangenome PolyPhen/SIFT   | `https://ftp.ensembl.org/pub/release-115/variation/pangenomes/Human/homo_sapiens_pangenome_PolyPhen_SIFT_20240502.db`             | 13 GB  | no, it is an SQLite database               | Ensembl / EMBL-EBI open      |
+| ClinVar (GRCh38)          | `clinvar_20260829.vcf.gz` under `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/` (+ `.tbi`)                | 105 MB | no, `.tbi` is published                    | public domain                |
+| ClinVar (CHM13)           | `clinvar_20240624_GCA_009914755.4.vcf.gz` under `https://ftp.ensembl.org/pub/rapid-release/species/Homo_sapiens/GCA_009914755.4/` | 190 MB | no, `.tbi` is published                    | public domain                |
+| CADD v1.7 SNVs (opt-in)   | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/whole_genome_SNVs.tsv.gz` (+ `.tbi`)                                 | 81 GB  | no, `.tbi` is published                    | free for non-commercial use  |
+| CADD v1.7 indels (opt-in) | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/gnomad.genomes.r4.0.indel.tsv.gz` (+ `.tbi`)                         | 1.2 GB | no, `.tbi` is published                    | free for non-commercial use  |
+| REVEL v1.3                | `https://rothsj06.dmz.hpc.mssm.edu/revel-v1.3_all_chromosomes.zip`                                                                | 667 MB | unpacked, re-sorted on GRCh38, indexed     | free for non-commercial use  |
+| EVE (opt-in)              | `https://evemodel.org/api/proteins/bulk/download/`                                                                                | 9.6 GB | unpacked, per-protein VCFs merged, indexed | non-commercial; see the site |
 
 ### Example: GRCh38
 
@@ -555,15 +580,18 @@ Two of these predictors get there anyway, because they score _proteins_ rather t
 - **SpliceAI** — not currently wired up on either assembly.
 
 > [!IMPORTANT]
-> **CADD and REVEL are enabled by default and are free for non-commercial use only**; EVE, if you
-> enable it, is the same. The pipeline cannot accept those terms on your behalf: if your work is
+> **REVEL is enabled by default and is free for non-commercial use only**; CADD and EVE, if you
+> enable them, are the same. The pipeline cannot accept those terms on your behalf: if your work is
 > commercial, pass `--skip_vep_plugins`, or set only the resources you are licensed for.
 
 > [!IMPORTANT]
 > Check that the contig naming of every file you supply matches your reference. The GRCh38 reference
-> used here is GATK-style (`chr1`), while NCBI's ClinVar VCF ships Ensembl-style names (`1`). A
-> mismatch produces empty annotation rather than an error, so it is easy to miss — confirm that
-> `CLNSIG` values actually appear in an annotated VCF before trusting them.
+> used here is GATK-style (`chr1`), while NCBI's ClinVar VCF ships Ensembl-style names (`1`). VEP
+> does try to reconcile the two for `--custom` files — `BaseVEP::get_source_chr_name` looks up
+> assembly synonyms, then tries adding and stripping a `chr` prefix — so this usually resolves
+> itself. It is not guaranteed for every contig, though, and a name it cannot map annotates nothing
+> rather than raising an error, so confirm that `CLNSIG` values actually appear in an annotated VCF
+> before trusting them.
 
 ## Core Nextflow arguments
 
