@@ -2,7 +2,8 @@ process MODKIT_PILEUP {
     tag "$meta.id"
     label 'process_high'
 
-    conda "${moduleDir}/environment.yml"
+    // Conda is not supported: the PacBio fixes below exist only in the patched image, and
+    // environment.yml would install stock ont-modkit 0.6.1 (the guard in `script:` stops conda/mamba runs)
     // Patched modkit 0.6.4 (nanoporetech/modkit#720, source: github.com/ljwharbers/modkit/tree/pacbio-conflict-fix) that keeps PacBio reads with 5mC+5hmC > 1 and honours --phased/--modified-bases in the general workers; revert to the biocontainer once released
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
         ? 'oras://ghcr.io/ljwharbers/modkit-sif:0.6.4-pacbiofix-6e0afa2'
@@ -23,6 +24,10 @@ process MODKIT_PILEUP {
     task.ext.when == null || task.ext.when
 
     script:
+    // Exit if running this module with -profile conda / -profile mamba
+    if (workflow.profile.tokenize(',').intersect(['conda', 'mamba']).size() >= 1) {
+        error "MODKIT_PILEUP does not support Conda: the PacBio fixes only exist in the patched container. Use Docker / Singularity / Apptainer, or --skip_modkit."
+    }
     def args        = task.ext.args ?: ''
     def prefix      = task.ext.prefix ?: "${meta.id}"
     def reference   = fasta ? "--ref ${fasta}" : ""
