@@ -2,6 +2,9 @@ nextflow_function {
 
     name "Test VEP plugin resolution functions"
     script "../main.nf"
+    // "small" is what .github/workflows/nf-test.yml selects on for pull_request; without it
+    // the shard step finds no tests here and none of this runs in CI. ~90 s for the file.
+    tag "small"
     tag "subworkflows"
     tag "subworkflows_local"
     tag "utils_nfcore_lrsomatic_pipeline"

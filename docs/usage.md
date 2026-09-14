@@ -128,6 +128,7 @@ If you want to run with a CHM13 reference without using `--genome CHM13` (for ex
 This cache carries gene and transcript models only, so every pathogenicity score on CHM13 has to come from a plugin. With `--genome CHM13` the pipeline fetches those itself; note that only the two predictors keyed on protein rather than genome coordinates can reach the assembly at all. See [VEP plugins](#vep-plugins) for which those are and why.
 
 Setting `--vep_genome T2T-CHM13v2.0` by hand, without `--genome CHM13`, resolves no plugin defaults — supply the `--vep_*` paths yourself, or accept VEP without plugin annotation.
+
 For mutational signatures, `--genome CHM13` selects the `CHM13-T2T` SigProfilerMatrixGenerator genome. Its payload is not on the AlexandrovLab FTP yet, so `--download_sigprofiler_genome` fetches it from the IntGenomicsLab Globus collection (`--sigprofiler_genome_url`); see [Mutational Signature Options](#mutational-signature-options).
 
 For structural variants, the CHM13 panel of normals is a merged panel combining the 1000 Genomes CHM13 panel shipped with SEVERUS and the ASAP cohort, with median confidence intervals per breakpoint. The pipeline exposes it as `--pon_file` and hands it to SEVERUS via that tool's own `--PON` flag; it is downloaded automatically with `--genome CHM13`. GRCh38 continues to use the 1000 Genomes panel shipped with SEVERUS.

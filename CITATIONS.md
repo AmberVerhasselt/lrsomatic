@@ -158,7 +158,7 @@
   is altered.** CC BY 4.0 permits this adaptation and its redistribution with attribution and, as
   given here, an indication of the changes made.
 
-- [Ensembl pangenome PolyPhen/SIFT database](https://ftp.ensembl.org/pub/current_variation/pangenomes/Human/)
+- [Ensembl pangenome PolyPhen/SIFT database](https://ftp.ensembl.org/pub/release-115/variation/pangenomes/Human/)
 
   VEP plugin data for the `PolyPhen_SIFT` plugin, fetched by default on `--genome CHM13` via
   `--vep_polyphen_sift_db`. This is how SIFT and PolyPhen predictions reach T2T-CHM13, since the
