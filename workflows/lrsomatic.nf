@@ -111,10 +111,10 @@ workflow LRSOMATIC {
 
     // Resolved once and handed to PREPARE_VEP_PLUGINS below, rather than resolved again there:
     // staging a plugin file checks it exists, which for the default resources is a HEAD request
-    // per URL. vep_plugin_args is read back by conf/modules.config.
+    // per URL. vep_plugins.args is passed straight to the VEP tasks -- it cannot travel through
+    // params, because conf/modules.config closures do not see a param assigned here.
     validateVepPluginParams()
     vep_plugins = resolveVepPlugins()
-    params.vep_plugin_args = vep_plugins.args
 
     vep_custom = params.vep_custom != null ? file(params.vep_custom) : []
     vep_custom_tbi = params.vep_custom_tbi != null ? file(params.vep_custom_tbi) : []
@@ -763,6 +763,7 @@ workflow LRSOMATIC {
             vep_cache,
             ch_fasta,
             ch_vep_extra_files,
+            vep_plugins.args,
             vep_custom,
             vep_custom_tbi
         )
@@ -783,6 +784,7 @@ workflow LRSOMATIC {
             vep_cache,
             ch_fasta,
             ch_vep_extra_files,
+            vep_plugins.args,
             vep_custom,
             vep_custom_tbi
         )
@@ -919,6 +921,7 @@ workflow LRSOMATIC {
             vep_cache,
             ch_fasta,
             [],
+            '',
             vep_custom,
             vep_custom_tbi
         )
