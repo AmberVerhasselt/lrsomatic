@@ -15,6 +15,7 @@ process ENSEMBLVEP_VEP {
     tuple val(meta2), path(cache)
     tuple val(meta3), path(fasta)
     path extra_files
+    val plugin_args
     path custom_vep
     path custom_vep_tbi
 
@@ -34,19 +35,27 @@ process ENSEMBLVEP_VEP {
     script:
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
+    // Resolved by the pipeline, not by ext.args: the plugin arguments name files staged through
+    // extra_files, so they are only knowable once the workflow has resolved them
+    def plugins = plugin_args ?: ''
     def file_extension = args.contains("--vcf") ? 'vcf' : args.contains("--json") ? 'json' : args.contains("--tab") ? 'tab' : 'vcf'
     def compress_cmd = args.contains("--compress_output") ? '' : '--compress_output bgzip'
     prefix = task.ext.prefix ?: "${meta.id}"
     def dir_cache = cache ? "\${PWD}/${cache}" : "/.vep"
     def reference = fasta ? "--fasta ${fasta}" : ""
     def create_index = file_extension == "vcf" ? "tabix ${args2} ${prefix}.${file_extension}.gz" : ""
-    args = args.replaceAll(/--custom file=[^,]+/, "--custom file=${custom_vep}")
-    
+    // Only the first --custom entry is rewritten, so further --custom tracks added through
+    // ext.args keep their own staged filenames
+    if (custom_vep) {
+        args = args.replaceFirst(/--custom file=[^,\s]+/, "--custom file=${custom_vep}")
+    }
+
     """
     vep \\
         -i ${vcf} \\
         -o ${prefix}.${file_extension}.gz \\
         ${args} \\
+        ${plugins} \\
         ${compress_cmd} \\
         ${reference} \\
         --assembly ${genome} \\
