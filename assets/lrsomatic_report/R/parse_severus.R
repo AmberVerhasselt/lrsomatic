@@ -12,6 +12,15 @@ SV_JUNCTION_CLASSES = c("translocation", "intra-chr breakend", "single breakend"
 SV_PANEL_WINDOW_BND   = 1e6   # distance from either breakend of a BND
 SV_PANEL_WINDOW_OTHER = 1e5   # distance from the span of a DEL/DUP/INV/INS
 
+# SV ring palette and y-positions. These live here, not in R/circos.R, because
+# severus_circos_tracks() below is what stamps them onto every row and the tests source this
+# file without circlize. There must be exactly one definition of each: draw_circos() labels the
+# SV ring's y-axis from SV_YPOS, so a second copy drifting from this one silently mislabels the
+# axis, and --circos-sv-* in assets/styles/report.scss mirrors SV_COLOURS for the HTML legend,
+# so a second copy there renders the legend in colours the plot never used.
+SV_COLOURS = c(INS = "#f97e02", DEL = "#020272", INV = "#e7cc02", DUP = "#e41a1c")
+SV_YPOS    = c(INS = 1.0,       DEL = 0.66,      INV = 0.33,      DUP = 0.05)
+
 # Read a VCF's data records; empty data.table for a header-only VCF
 .severus_read_vcf = function(vcf_file, col_names) {
   con = gzfile(vcf_file, "rb")
@@ -145,11 +154,9 @@ severus_circos_tracks = function(records) {
                    by = ".link_key")[, .link_key := NULL]
   }
 
-  SV_COL  = c(INS = "#f97e02", DEL = "#020272", INV = "#e7cc02", DUP = "#e41a1c")
-  SV_YPOS = c(INS = 1.0,       DEL = 0.66,      INV = 0.33,      DUP = 0.05)
   nontrans = records[!is_bnd,
     .(chrom = chrom_a, pos = pos_a, end = pos_b, svtype, svlen = sv_len,
-      circos_pos = unname(SV_YPOS[svtype]), circos_col = unname(SV_COL[svtype]))]
+      circos_pos = unname(SV_YPOS[svtype]), circos_col = unname(SV_COLOURS[svtype]))]
 
   list(translocations = trans, nontrans = nontrans)
 }

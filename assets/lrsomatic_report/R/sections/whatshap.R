@@ -48,3 +48,48 @@ register_section(list(
     )
   }
 ))
+
+# Genome-wide totals for the header card: whatshap's own ALL row when it wrote one, otherwise
+# the per-chromosome rows summed. NULL when there is nothing to total, which is what lets the
+# card be omitted rather than render a permanent "N/A". Every field is read through a names()
+# guard: `w$phased_fraction` is NULL when the column is absent, and `is.na(NULL)` is logical(0),
+# which errors rather than falling back.
+whatshap_totals = function(whatshap) {
+  if (is.null(whatshap)) return(NULL)
+
+  num1 = function(x, key) {
+    if (is.null(x) || !key %in% names(x)) return(NA_real_)
+    v = suppressWarnings(as.numeric(x[[key]]))
+    if (length(v) == 0) NA_real_ else v[1]
+  }
+
+  all_row = whatshap$all
+  if (!is.null(all_row)) {
+    phased   = num1(all_row, "phased")
+    variants = num1(all_row, "variants")
+    fraction = num1(all_row, "phased_fraction")
+  } else {
+    # No ALL row: sum the per-chromosome rows rather than go quiet under a healthy table
+    pc = whatshap$per_chrom
+    if (is.null(pc) || nrow(pc) == 0) return(NULL)
+    # na.rm = TRUE makes an all-missing column sum to 0, which then survives the
+    # is.na(phased) && is.na(fraction) guard below and renders a confident "0" in the header
+    # card. whatshap leaves the field empty for a chromosome with no het variants, so a file
+    # where that is true of every row is the case this distinguishes.
+    sum1 = function(key) {
+      if (!key %in% names(pc)) return(NA_real_)
+      v = suppressWarnings(as.numeric(pc[[key]]))
+      if (all(is.na(v))) NA_real_ else sum(v, na.rm = TRUE)
+    }
+    phased   = sum1("phased")
+    variants = sum1("variants")
+    fraction = NA_real_
+  }
+
+  # phased_fraction is a 0-1 fraction; recompute when the column is absent or the rows were summed
+  if (is.na(fraction) && !is.na(phased) && !is.na(variants) && variants > 0)
+    fraction = phased / variants
+  if (is.na(phased) && is.na(fraction)) return(NULL)
+
+  list(phased = phased, variants = variants, fraction = fraction)
+}

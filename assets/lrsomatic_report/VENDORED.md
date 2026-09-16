@@ -6,8 +6,8 @@ Do not edit it here — fix upstream, tag a release, and re-sync.
 | | |
 |---|---|
 | Upstream | <https://github.com/ljwharbers/lrsomatic_report> |
-| Release | `v1.3.2` (`75c65b2b68968f3d742dbfd1ca7ef780dbdaf770`) |
-| Vendored commit | `75c65b2b68968f3d742dbfd1ca7ef780dbdaf770` (the tag itself) |
+| Release | `v1.4.0` (`3a178c8120c5ab37a644a83d2f318d326c2ccd38`) |
+| Vendored commit | `3a178c8120c5ab37a644a83d2f318d326c2ccd38` (the tag itself) |
 | License | MIT (see `LICENSE`) |
 
 ## Why vendored rather than a submodule
@@ -37,7 +37,7 @@ they must be left behind by hand when copying.)
 ## Re-syncing on the next upstream release
 
 ```bash
-TAG=v1.4.0
+TAG=v1.5.0
 git clone --depth 1 --branch "$TAG" https://github.com/ljwharbers/lrsomatic_report.git "$TMPDIR/lrr"
 rm -rf assets/lrsomatic_report/{bin,R,templates,assets,LICENSE,README.md}
 cp -a "$TMPDIR"/lrr/{bin,R,templates,assets,LICENSE,README.md} assets/lrsomatic_report/

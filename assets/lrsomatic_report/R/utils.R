@@ -26,10 +26,30 @@ parse_extra_kv = function(extra_string) {
 
 # Vectorised: extract one key from VEP Extra column for each row
 extract_extra_key = function(extra_vec, key) {
-  vapply(extra_vec, function(x) {
-    kv = parse_extra_kv(x)
-    if (key %in% names(kv)) kv[[key]] else NA_character_
-  }, character(1), USE.NAMES = FALSE)
+  extract_extra_keys(extra_vec, key)[[key]]
+}
+
+# Several keys in one pass over the Extra column: returns a named list of character vectors (NA where the key is absent). One split per row rather than one per row per key, which is what keeps the text path tractable with a dozen keys
+extract_extra_keys = function(extra_vec, keys) {
+  extra_vec = as.character(extra_vec)
+  n = length(extra_vec)
+  out = setNames(rep(list(rep(NA_character_, n)), length(keys)), keys)
+  if (n == 0 || length(keys) == 0) return(out)
+
+  pairs = strsplit(extra_vec, ";", fixed = TRUE)
+  lens  = lengths(pairs)
+  flat  = unlist(pairs, use.names = FALSE)
+  row   = rep.int(seq_len(n), lens)
+  eq    = regexpr("=", flat, fixed = TRUE)
+  has   = eq > 0
+  key   = substr(flat[has], 1L, eq[has] - 1L)
+  val   = substr(flat[has], eq[has] + 1L, nchar(flat[has]))
+  row   = row[has]
+  for (k in keys) {
+    hit = which(key == k)
+    if (length(hit)) out[[k]][row[hit]] = val[hit]
+  }
+  out
 }
 
 # ---- Gene panels: plain lists (they round-trip through Quarto execute_params) of name, path, reference, has_coords, genes and, when has_coords, parallel chrom/start/end/interval_gene ----
@@ -229,21 +249,6 @@ unique_panel_name = function(nm, taken) {
     cand = paste0(nm, "-custom", i)
   }
   cand
-}
-
-# Resolve selected panel keys to panel objects, re-read from disk (the YAML round trip list-ifies the vectors); not tryCatch-wrapped so an unresolvable panel fails the render
-resolve_selected_panels = function(keys, all_panels, assets_dir, reference = NULL) {
-  keys = setdiff(as.character(unlist(keys)), "__all__")
-  keys = keys[!is.na(keys) & nzchar(keys)]
-  if (length(keys) == 0) return(list())
-  out = list()
-  for (k in unique(keys)) {
-    p    = if (!is.null(all_panels)) all_panels[[k]] else NULL
-    path = if (!is.null(p) && !is.null(p$path)) as.character(p$path)[1] else NA_character_
-    out[[k]] = if (!is.na(path) && file.exists(path)) load_gene_panel(path, reference)
-               else resolve_gene_panel(k, assets_dir, reference)
-  }
-  out[!vapply(out, is.null, logical(1))]
 }
 
 # Pull every occurrence of a repeatable flag out of argv (optparse has no action="append"); accepts `--flag value` and `--flag=value`

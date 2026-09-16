@@ -65,7 +65,7 @@ if (!is.null(bnd_res) && !is.null(bnd_res$data)) {
 # Column positions published from R, not scraped from the header
 if (!is.null(sv_table) && nrow(sv_table) > 0) {
   sv_display = copy(sv_table)
-  # Populated client-side by the panel filter; load-time hits are already in sv_panel_hit
+  # Populated client-side by the panel filter (svPanelHits()), including on load
   sv_display[, panel_hit := ""]
   # Readable locus/size/gene columns; the raw bedpe columns stay (hidden, exported, read by the JS). See sv_display_columns()
   sv_display = cbind(sv_display, sv_display_columns(sv_display, chromosomes))

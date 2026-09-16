@@ -98,6 +98,19 @@ the same time — see [Gene panels](#gene-panels).
 > - The SV table's footnote about how the panel matches now follows the ticked boxes; it
 >   previously described the load-time panel and went stale the moment a reader switched.
 
+> **Changed in v1.4.0:**
+> - The small-variant table now shows the VEP plugin annotations LRSomatic adds:
+>   AlphaMissense (`am_class`, `am_score`), ClinVar (`clinvar`, `clinvar_id`, linked to
+>   the ClinVar record), CADD, REVEL and EVE where the run had them. SIFT and PolyPhen
+>   are read from the `PolyPhen_SIFT` plugin on T2T, whose VEP cache carries neither — those
+>   two columns were empty on every T2T report — and each predictor's class and score are
+>   separate columns, so the class has a tickbox filter and the score sorts numerically.
+>   Pathogenic-class calls are tinted.
+> - A column appears only when the VEP run declared its source: a plugin that was not on
+>   gives no column rather than an empty one, and `cosmic`/`dbsnp` are gone on T2T, whose
+>   cache has no variation data. A new **Annotation sources** footnote under the table
+>   names what was present and what was not.
+
 > **Changed in v1.3.1:**
 > - A calmer look. The page texture, gradients, card animations and shadows are gone;
 >   every card, table and plot frame shares one flat surface. The summary numbers are

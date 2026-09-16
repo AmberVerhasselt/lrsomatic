@@ -78,7 +78,10 @@ $border-radius-lg:     8px;
   --impact-low:      #e4efe3;
   --impact-modifier: #f3f1ea;
 
-  // SV-type colour tokens (values match formatStyle in _sv.qmd)
+  // SV-type colour tokens (values match formatStyle in _sv.qmd). These are the table's
+  // pale row backgrounds and are deliberately NOT hue-matched to --circos-sv-* below:
+  // DUP is green here and red on the ring. The circos vars mirror SV_COLOURS, which is
+  // what the plot is drawn with, so a legend that agreed with these would lie about it.
   --sv-del:  #dbeafe;
   --sv-dup:  #dcfce7;
   --sv-inv:  #fef9c3;
@@ -92,11 +95,11 @@ $border-radius-lg:     8px;
   --circos-snv-ta:  #c7c2b8;
   --circos-snv-tc:  #ADCC54;
   --circos-snv-tg:  #F0D0CE;
-  // SV (hue-matched to --sv-* table tokens)
-  --circos-sv-ins:  #cf5b46;
-  --circos-sv-del:  #2f6db3;
-  --circos-sv-inv:  #c08a1e;
-  --circos-sv-dup:  #3f7d4e;
+  // SV — must match SV_COLOURS in R/parse_severus.R, which is what the ring is drawn with
+  --circos-sv-ins:  #f97e02;
+  --circos-sv-del:  #020272;
+  --circos-sv-inv:  #e7cc02;
+  --circos-sv-dup:  #e41a1c;
   // CNV (tied to report spine)
   --circos-cnv-major: #b3402f;
   --circos-cnv-minor: #0d5c75;

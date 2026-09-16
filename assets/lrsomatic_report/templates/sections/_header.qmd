@@ -44,6 +44,8 @@ metric_group = function(title, ...) {
   )
 }
 
+phasing = whatshap_totals(SECTION_DATA$whatshap)
+
 div(class = "metric-groups",
   metric_group("Tumour",
     card("Purity",        fmt_val(ascat_pp$purity),            "metric-purity"),
@@ -60,9 +62,7 @@ div(class = "metric-groups",
     # One row per rearrangement, not per breakend record — see the note under the SV table.
     card(lc_plural("SVs"),   fmt_val(n_sv, 0),          "metric-svs",
          subtitle = if (!is.na(n_trans) && !is.na(n_intra_bnd))
-           paste0(n_trans, " interchrom · ", n_intra_bnd, " intrachrom BND") else NULL),
-    card("Panel variants",fmt_val(n_panel_vars, 0),            "metric-panel-vars"),
-    card(lc_plural("Panel SVs"),     fmt_val(n_panel_svs, 0),   "metric-panel-svs")
+           paste0(n_trans, " interchrom · ", n_intra_bnd, " intrachrom BND") else NULL)
   ),
   metric_group("Sequencing",
     card("Mean coverage", paste0(fmt_val(qc_mosdepth$mean_depth), "×"), "metric-coverage"),
@@ -71,12 +71,22 @@ div(class = "metric-groups",
          if (!is.null(samtools_stats) && !is.na(samtools_stats$error_rate))
            paste0(formatC(samtools_stats$error_rate * 100, format = "f", digits = 3), "%") else "N/A",
          "metric-error"),
-    card("Phased variants",
-         { w = SECTION_DATA$whatshap$all
-           if (!is.null(w) && !is.na(w$phased_fraction))
-             paste0(fmt_val(w$phased_fraction * 100, 1), "%") else "N/A" },
-         "metric-phased",
-         subtitle = "germline, WhatsHap")
+    # Omitted, not "N/A": a run without phasing has no number here, and QC > Phasing
+    # already carries the "not found" notice. htmltools drops a NULL child.
+    if (!is.null(phasing))
+      card("Phased variants",
+           # Element-wise formatC, never vectorised format() — see js_num()
+           if (!is.na(phasing$phased))
+             formatC(phasing$phased, format = "d", big.mark = ",")
+           else sprintf("%.1f%%", phasing$fraction * 100),
+           "metric-phased",
+           subtitle = paste(c(
+             if (is.na(phasing$phased) || is.na(phasing$fraction)) NULL
+             else if (!is.na(phasing$variants))
+               sprintf("%.1f%% of %s", phasing$fraction * 100,
+                       formatC(phasing$variants, format = "d", big.mark = ","))
+             else sprintf("%.1f%% phased", phasing$fraction * 100),
+             "germline, WhatsHap"), collapse = " · "))
   )
 )
 ```

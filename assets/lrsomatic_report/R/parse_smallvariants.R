@@ -16,6 +16,108 @@ derive_dbsnp_cosmic = function(dt) {
   dt
 }
 
+# Report columns fed by VEP plugins or optional cache data, and the CSQ/Extra fields that can supply each (first present wins). Built-in SIFT/PolyPhen carry class and score in one field, `deleterious(0.01)`; the PolyPhen_SIFT plugin (T2T, whose cache has neither) splits them. humVar, not humDiv: it is what VEP's built-in PolyPhen reports
+VEP_ANNOTATION_FIELDS = list(
+  sift           = c("SIFT", "SIFT_pred"),
+  sift_score     = c("SIFT", "SIFT_score"),
+  polyphen       = c("PolyPhen", "PolyPhen_humvar_pred"),
+  polyphen_score = c("PolyPhen", "PolyPhen_humvar_score"),
+  am_class       = "am_class",
+  am_score       = "am_pathogenicity",
+  clinvar        = c("ClinVar_CLNSIG", "CLIN_SIG"),
+  clinvar_id     = "ClinVar",
+  cadd           = "CADD_PHRED",
+  revel          = "REVEL",
+  eve_class      = "EVE_CLASS",
+  eve_score      = "EVE_SCORE"
+)
+VEP_SCORE_COLUMNS = c("sift_score", "polyphen_score", "am_score", "cadd", "revel", "eve_score")
+
+# Annotation sources as the footnote names them, with the report columns each feeds
+VEP_ANNOTATION_GROUPS = list(
+  SIFT          = c("sift", "sift_score"),
+  PolyPhen      = c("polyphen", "polyphen_score"),
+  AlphaMissense = c("am_class", "am_score"),
+  ClinVar       = c("clinvar", "clinvar_id"),
+  CADD          = "cadd",
+  REVEL         = "revel",
+  EVE           = c("eve_class", "eve_score"),
+  dbSNP         = "dbsnp",
+  COSMIC        = "cosmic"
+)
+
+# Prediction classes tinted in the table; low-confidence and "possibly" calls stay plain
+PATHOGENIC_CLASSES = c("deleterious", "probably_damaging", "pathogenic", "likely_pathogenic",
+                       "Pathogenic", "Likely_pathogenic", "Pathogenic/Likely_pathogenic")
+
+# Which source field supplies each annotation column given the fields a file declares; NA where none does
+resolve_vep_fields = function(available) {
+  vapply(VEP_ANNOTATION_FIELDS, function(cands) {
+    hit = cands[cands %in% available]
+    if (length(hit)) hit[1] else NA_character_
+  }, character(1))
+}
+
+# Whether the VEP cache carried dbSNP/COSMIC IDs, from the header (`##VEP=... dbSNP="156"` in a VCF, `## dbSNP version 156` in text output); NA when the header says nothing either way. The text scan is anchored at line start: every VEP text header describes its own Extra keys, and `## CLIN_SIG : ClinVar clinical significance of the dbSNP variant` matched an unanchored "dbSNP", which kept a permanently empty dbsnp column on every T2T text report
+vep_cache_sources = function(header_lines) {
+  vep_line = grep("^##VEP=", header_lines, value = TRUE)
+  is_text  = any(grepl("^## ENSEMBL VARIANT EFFECT PREDICTOR", header_lines))
+  if (length(vep_line) == 0 && !is_text) return(c(dbsnp = NA, cosmic = NA))
+  said = function(key) {
+    if (length(vep_line)) grepl(paste0("\\b", key, "[= ]"), vep_line[1])
+    else any(grepl(paste0("^## ", key, "[ =]"), header_lines))
+  }
+  c(dbsnp = said("dbSNP"), cosmic = said("COSMIC"))
+}
+
+# Attach the annotation columns a file declares. `get_field(name)` returns that CSQ/Extra field as a character vector. A column whose source is not declared is not created (the plugin did not run); one declared but empty stays all NA (it ran and found nothing). The resolution is kept as attr "vep_fields" for the footnote
+add_vep_annotations = function(dt, get_field, available, cache = c(dbsnp = NA, cosmic = NA)) {
+  resolved = resolve_vep_fields(available)
+  for (col in names(resolved)) {
+    if (is.na(resolved[[col]])) next
+    dt[, (col) := as.character(get_field(resolved[[col]]))]
+  }
+  # Built-in `deleterious(0.01)`: one field feeds both the class and the score column
+  for (base in c("sift", "polyphen")) {
+    sc = paste0(base, "_score")
+    if (!is.na(resolved[[base]]) && identical(resolved[[base]], resolved[[sc]])) {
+      raw = dt[[base]]
+      dt[, (sc)   := sub("^.*\\(([^()]*)\\)\\s*$", "\\1", raw)]
+      dt[, (base) := sub("\\(.*$", "", raw)]
+      dt[!grepl("(", raw, fixed = TRUE), (sc) := NA_character_]
+    }
+  }
+  for (col in intersect(names(resolved), names(dt))) {
+    dt[get(col) == "", (col) := NA_character_]
+  }
+  # Multi-valued custom fields arrive "&"-joined, like Consequence; the facet splits on "," and the ClinVar link render splits the id cell the same way
+  for (col in intersect(c("clinvar", "clinvar_id"), names(dt))) {
+    dt[, (col) := gsub("&", ",", get(col), fixed = TRUE)]
+  }
+  for (col in intersect(VEP_SCORE_COLUMNS, names(dt))) {
+    dt[, (col) := suppressWarnings(as.numeric(get(col)))]
+  }
+  # dbSNP/COSMIC come from the cache, not a plugin: dropped only when the header says the cache has none
+  for (col in c("dbsnp", "cosmic")) {
+    if (isFALSE(cache[[col]])) dt[, (col) := NULL]
+    resolved[col] = if (isFALSE(cache[[col]])) NA_character_ else "Existing_variation"
+  }
+  setattr(dt, "vep_fields", resolved)
+  dt
+}
+
+# One row per annotation source for the footnote: the columns it feeds, the CSQ fields that fed them, and whether this run had it at all
+vep_annotation_summary = function(vep_fields) {
+  if (is.null(vep_fields)) return(NULL)
+  rbindlist(lapply(names(VEP_ANNOTATION_GROUPS), function(g) {
+    cols = VEP_ANNOTATION_GROUPS[[g]]
+    src  = unique(unname(vep_fields[cols]))
+    src  = src[!is.na(src)]
+    data.table(source = g, columns = paste(cols, collapse = ", "),
+               fields = paste(src, collapse = ", "), present = length(src) > 0)
+  }))
+}
+
 # Dispatch on file contents: VEP text output (#Uploaded_variation header) vs VCF with CSQ (#CHROM header)
 parse_vep = function(vep_file) {
   if (is.null(vep_file) || !file.exists(vep_file)) return(NULL)
@@ -40,10 +142,12 @@ parse_vep_text = function(vep_file) {
   # Count meta-lines (start with ##) to find the column-header line
   con = gzfile(vep_file, "rb")
   skip_n = 0L
+  hdr = character(0)
   repeat {
     line = readLines(con, n = 1, warn = FALSE)
     if (length(line) == 0) break
     if (startsWith(line, "#Uploaded_variation")) break
+    hdr = c(hdr, line)
     skip_n = skip_n + 1L
   }
   close(con)
@@ -75,16 +179,40 @@ parse_vep_text = function(vep_file) {
   dt[, ref := sub(".*_([^/]+)/.*", "\\1", variant_id)]
   dt[, alt := sub(".*/", "", variant_id)]
 
-  # Parse VEP Extra key=value field
-  dt[, symbol   := extract_extra_key(Extra, "SYMBOL")]
-  dt[, impact   := extract_extra_key(Extra, "IMPACT")]
-  dt[, existing := extract_extra_key(Extra, "Existing_variation")]
-  dt[, sift     := extract_extra_key(Extra, "SIFT")]
-  dt[, polyphen := extract_extra_key(Extra, "PolyPhen")]
-  dt[, hgvsp    := extract_extra_key(Extra, "HGVSp")]
+  # Extra keys the file declares (`## KEY : description` header lines), plus any annotation key actually present in a row, for files whose header omits them
+  cands    = unique(unlist(VEP_ANNOTATION_FIELDS, use.names = FALSE))
+  declared = sub("^## (\\S+) : .*$", "\\1", grep("^## \\S+ : ", hdr, value = TRUE))
+
+  # One alternation pass over Extra, only for keys the header did not already declare, and the matches are extracted only from the rows that hit: one grepl() per key was 8.8 s of every render at 171k rows, this is 0.8 s
+  unseen   = setdiff(cands, declared)
+  observed = character(0)
+  if (length(unseen) > 0) {
+    xtr = as.character(dt$Extra)
+    xtr[is.na(xtr)] = ""
+    pat = paste0("(?:^|;)(", paste(unseen, collapse = "|"), ")=")
+    hit = grepl(pat, xtr, perl = TRUE)
+    if (any(hit)) {
+      hits = unlist(regmatches(xtr[hit], gregexpr(pat, xtr[hit], perl = TRUE)), use.names = FALSE)
+      observed = intersect(unseen, unique(sub("^;?(.*)=$", "\\1", hits)))
+    }
+  }
+  available = union(declared, observed)
+
+  # Parse the VEP Extra key=value field in one pass
+  ex = extract_extra_keys(dt$Extra, unique(c("SYMBOL", "IMPACT", "HGVSp",
+                                             intersect(cands, available))))
+  dt[, symbol := ex$SYMBOL]
+  dt[, impact := ex$IMPACT]
+  dt[, hgvsp  := ex$HGVSp]
+
+  # Existing_variation is a column of the text format, never an Extra key; reading it from Extra left it - and so dbsnp/cosmic - empty on every text report
+  dt[, existing := if ("Existing_variation" %in% names(dt)) as.character(Existing_variation)
+                   else NA_character_]
+  dt[existing %in% c("", "-"), existing := NA_character_]
 
   # dbSNP / COSMIC IDs, derived from Existing_variation
   dt = derive_dbsnp_cosmic(dt)
+  dt = add_vep_annotations(dt, function(nm) ex[[nm]], available, vep_cache_sources(hdr))
 
   # No per-variant caller in the text format; kept for contract parity with parse_vep_vcf()
   dt[, caller := NA_character_]
@@ -107,9 +235,11 @@ parse_vep_vcf = function(vep_file) {
   skip_n = 0L
   csq_format = NULL
   has_caller_info = FALSE
+  hdr = character(0)
   repeat {
     line = readLines(con, n = 1, warn = FALSE)
     if (length(line) == 0) break
+    hdr = c(hdr, line)
     if (startsWith(line, "##INFO=<ID=CSQ")) {
       m = regmatches(line, regexpr("Format: [^\"]+", line))
       if (length(m) > 0) csq_format = strsplit(sub("^Format: ", "", m), "|", fixed = TRUE)[[1]]
@@ -164,9 +294,10 @@ parse_vep_vcf = function(vep_file) {
                by = .(CHROM, POS, REF, ALT, id, caller)]
   if (nrow(dt_long) == 0) return(NULL)
 
-  # Split each entry on "|", keeping only the fields used below
-  need = c("Consequence", "IMPACT", "SYMBOL", "Gene", "HGVSp",
-           "Existing_variation", "SIFT", "PolyPhen")
+  # Split each entry on "|", keeping the fields used below plus whichever annotation fields this header declares. `need` is not in CSQ order - a real GRCh38 header puts ClinVar_CLNSIG after CADD_PHRED - and names(parts) relies on tstrsplit() returning `keep` in the order asked for, not sorted
+  resolved = resolve_vep_fields(csq_format)
+  need = unique(c("Consequence", "IMPACT", "SYMBOL", "Gene", "HGVSp", "Existing_variation",
+                  resolved[!is.na(resolved)]))
   keep_idx = match(need, csq_format)
   ok = !is.na(keep_idx)
   parts = tstrsplit(dt_long$csq_entry, "|", fixed = TRUE, fill = NA_character_,
@@ -183,12 +314,9 @@ parse_vep_vcf = function(vep_file) {
   dt_long[, gene_id     := get_field("Gene")]
   dt_long[, hgvsp       := get_field("HGVSp")]
   dt_long[, existing    := get_field("Existing_variation")]
-  dt_long[, sift        := get_field("SIFT")]
-  dt_long[, polyphen    := get_field("PolyPhen")]
 
   # Blank CSQ fields are "", not NA; normalise for parity with parse_vep_text()
-  for (col in c("symbol", "impact", "hgvsp", "existing", "gene_id", "sift", "polyphen",
-                "caller")) {
+  for (col in c("symbol", "impact", "hgvsp", "existing", "gene_id", "caller")) {
     dt_long[get(col) == "", (col) := NA_character_]
   }
 
@@ -202,9 +330,14 @@ parse_vep_vcf = function(vep_file) {
 
   # dbSNP / COSMIC IDs, derived from Existing_variation
   dt_long = derive_dbsnp_cosmic(dt_long)
+  dt_long = add_vep_annotations(dt_long, get_field, csq_format, vep_cache_sources(hdr))
 
-  dt_long[, .(chrom, pos, ref, alt, id, symbol, gene_id, consequence, impact, hgvsp,
-              existing, dbsnp, cosmic, sift, polyphen, caller, coord_space)]
+  keep = c("chrom", "pos", "ref", "alt", "id", "symbol", "gene_id", "consequence", "impact",
+           "hgvsp", "existing", "dbsnp", "cosmic", names(VEP_ANNOTATION_FIELDS),
+           "caller", "coord_space")
+  out = dt_long[, intersect(keep, names(dt_long)), with = FALSE]
+  setattr(out, "vep_fields", attr(dt_long, "vep_fields"))
+  out
 }
 
 # Pick the sample column: one is unambiguous; else the report's sample, then the first non-normal; the first column is a flagged guess
@@ -420,6 +553,7 @@ classify_mut = function(ref, alt) {
 # Small-variant display table: VEP rows with VAF/depth/phasing joined from the annotated VCF; gene_panel filters symbols (NULL = all)
 build_variant_table = function(vep_data, vaf_data, gene_panel = NULL) {
   if (is.null(vep_data) || nrow(vep_data) == 0) return(NULL)
+  vep_fields = attr(vep_data, "vep_fields")   # merge()/unique() below drop attributes
 
   # Impact ranking for deduplication
   impact_rank = c(HIGH = 1L, MODERATE = 2L, LOW = 3L, MODIFIER = 4L)
@@ -467,10 +601,13 @@ build_variant_table = function(vep_data, vaf_data, gene_panel = NULL) {
   vep_data[nchar(ref) == 1 & nchar(alt) == 1,
            mut_cat := classify_mut(ref, alt)]
 
+  # Annotation columns exist only when the VEP run declared their source (see add_vep_annotations())
   display_cols = c("symbol", "chrom", "pos", "ref", "alt",
                    "consequence", "impact", "hgvsp",
                    "vaf", "dp", "gt", "ps",
-                   "callers", "cosmic", "dbsnp", "sift", "polyphen")
+                   "callers", "cosmic", "dbsnp", names(VEP_ANNOTATION_FIELDS))
   display_cols = display_cols[display_cols %in% names(vep_data)]
-  vep_data[, ..display_cols]
+  out = vep_data[, ..display_cols]
+  setattr(out, "vep_fields", vep_fields)
+  out
 }
