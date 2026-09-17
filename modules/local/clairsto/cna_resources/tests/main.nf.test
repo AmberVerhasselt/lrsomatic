@@ -9,8 +9,7 @@ nextflow_process {
     tag "clairsto_cna_resources"
     tag "small"
 
-    // Lays out the ASCAT files the way ClairS-TO resolves them: one file ending in chr1.txt per
-    // sub-directory to derive the prefix from, and exactly one GC_*.txt at the top.
+    // One file ending in chr1.txt per sub-directory, and exactly one GC_*.txt at the top
     test("CHM13 ASCAT set - builds the resource directory") {
 
         when {
@@ -43,14 +42,12 @@ nextflow_process {
                 { assert new File(dir, 'allele_files').list().sort() ==
                     ['G1000_alleles_CHM13_chr1.txt', 'G1000_alleles_CHM13_chr2.txt'] },
 
-                // GCcontent_SNPloci_CHM13.txt does not match the GC_*.txt the resolver looks for,
-                // so it is renamed after the assembly
+                // Not a GC_*.txt, so it is renamed after the assembly
                 { assert root.findAll { name -> name.startsWith('GC_') } == ['GC_CHM13.txt'] },
                 { assert new File(dir, 'GC_CHM13.txt').text ==
                     new File("${projectDir}/modules/local/clairsto/cna_resources/tests/fixtures/gc/GCcontent_SNPloci_CHM13.txt").text },
 
-                // Deliberately absent: with no RT_*.txt, Verdict corrects LogR for GC content
-                // only, as ASCAT does and as ClairS-TO recommends for CHM13
+                // Deliberately absent: without an RT_*.txt, Verdict corrects LogR for GC only
                 { assert root.findAll { name -> name.startsWith('RT_') } == [] },
 
                 // Nothing else, or the resolver would see a second candidate and refuse to guess
@@ -61,8 +58,7 @@ nextflow_process {
         }
     }
 
-    // A GC file already named GC_*.txt keeps its name, so the GRCh38 set resolves to the same
-    // paths ClairS-TO used before --cna_resource_dir existed.
+    // A GC file already named GC_*.txt keeps its name, so the GRCh38 set resolves as before
     test("GC file already named GC_*.txt - name is preserved") {
 
         when {
@@ -89,8 +85,7 @@ nextflow_process {
         }
     }
 
-    // More than one candidate would make ClairS-TO report an ambiguous resource set at run time;
-    // fail here instead, where the message names the files.
+    // ClairS-TO would report an ambiguous resource set; fail here, where the message names files
     test("two GC files - fails with a useful message") {
 
         when {

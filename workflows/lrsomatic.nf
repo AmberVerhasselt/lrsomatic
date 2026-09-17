@@ -111,10 +111,8 @@ workflow LRSOMATIC {
     params.sigprofiler_genome = getGenomeAttribute('sigprofiler_genome')
     params.sigprofiler_genome_url = getGenomeAttribute('sigprofiler_genome_url')
 
-    // Resolved once and handed to PREPARE_VEP_PLUGINS below, rather than resolved again there:
-    // staging a plugin file checks it exists, which for the default resources is a HEAD request
-    // per URL. vep_plugins.args is passed straight to the VEP tasks -- it cannot travel through
-    // params, because conf/modules.config closures do not see a param assigned here.
+    // Resolved once here to avoid a HEAD request per default plugin URL, and passed straight to
+    // the VEP tasks: conf/modules.config closures do not see a param assigned here.
     validateVepPluginParams()
     vep_plugins = resolveVepPlugins()
 
@@ -181,15 +179,12 @@ workflow LRSOMATIC {
     //   -- single tuple of parallel lists; each flag indicates whether the corresponding VCF
     //      is a population allele database (True) vs. a panel-of-normals artefact file (False)
 
-    // ClairS-TO's Verdict module resolves its ASCAT loci/allele/GC set from --cna_resource_dir.
-    // The image ships the GRCh38 set, so resources are only needed when the reference is another
-    // assembly. A prepared directory can be named instead, which also allows a set carrying an
-    // RT_*.txt; without one, Verdict corrects LogR for GC content only, as ASCAT does.
+    // Verdict resolves its ASCAT loci/allele/GC set from --cna_resource_dir. The image ships the
+    // GRCh38 set, so resources are only needed for another assembly.
     clairsto_cna_dir = params.clairsto_cna_resources
         ? validateClairstoCnaResources(params.clairsto_cna_resources)
         : null
-    // Built from the assembly's own ASCAT files only when no directory was supplied. CHM13 has no
-    // ascat_loci_rt attribute, so the built set is GC-only by construction.
+    // CHM13 has no ascat_loci_rt attribute, so the built set is GC-only by construction
     build_clairsto_cna = clairsto_cna_dir == null && params.genome == 'CHM13'
 
     // DeepSomatic PON channel: user-supplied VCF paths, or empty list (process falls back to container defaults)
@@ -204,10 +199,8 @@ workflow LRSOMATIC {
                 getGenomeAttribute('asap')
               ]
             : []
-    // DeepSomatic requires no chromosome overlap across population VCFs.
-    // When multiple databases are provided (e.g., CHM13 gnomad + 1kgenomes + colors + dbsnp + asap),
-    // the merge is done inline inside DEEPSOMATIC_MAKEEXAMPLES and DEEPSOMATIC_POSTPROCESSVARIANTS
-    // so that both callers can start in parallel as soon as BAMs are ready.
+    // DeepSomatic requires no chromosome overlap across population VCFs; several databases are
+    // merged inline inside DEEPSOMATIC_MAKEEXAMPLES/POSTPROCESSVARIANTS so callers start in parallel.
     channel.value( [[:], ds_pon_files] ).set { ds_pon_channel }
     // ds_pon_channel: [[:], [vcf_path, ...]] or [[:], []]
     //   -- raw unmerged PON VCF paths (no .tbi required); merging happens inline in each DeepSomatic process
@@ -280,30 +273,25 @@ workflow LRSOMATIC {
 
     //
     // MODULE: CLAIRSTO_CNA_RESOURCES (label: process_single)
-    // Lays the ASCAT loci/allele/GC set out as the directory Verdict expects. Skipped when a
-    // prepared directory was supplied, or when the image's own GRCh38 set is the right one.
+    // Lays the ASCAT loci/allele/GC set out as the directory Verdict expects
     //
     if (build_clairsto_cna) {
-        // Each of these emits once, and that one item is itself a list of paths. merge() and
-        // combine() would flatten the three lists into a single run of files, so key them on a
-        // shared meta and join: join appends the non-key part of each as one element, leaving
-        // [meta, [loci...], [alleles...], [gc]].
+        // Each emits one list of paths: merge()/combine() would flatten the three into a single
+        // run of files, so key them on a shared meta and join.
         cna_key = [ id: params.genome ]
         CLAIRSTO_CNA_RESOURCES(
             PREPARE_REFERENCE_FILES.out.loci_files.map { files -> [ cna_key, files ] }
                 .join( PREPARE_REFERENCE_FILES.out.allele_files.map { files -> [ cna_key, files ] } )
                 .join( PREPARE_REFERENCE_FILES.out.gc_file.map { files -> [ cna_key, files ] } )
         )
-        // .first(): a process output is a queue channel, and CLAIRSTO would then run for only
-        // the first tumour-only sample.
+        // .first(): a process output is a queue channel, so CLAIRSTO would run once in total
         clairsto_cna_channel = CLAIRSTO_CNA_RESOURCES.out.cna_resources.first()
         ch_versions = ch_versions.mix(CLAIRSTO_CNA_RESOURCES.out.versions)
     }
     else {
         clairsto_cna_channel = channel.value( [ [:], clairsto_cna_dir ?: [] ] )
     }
-    // clairsto_cna_channel: [meta, cna_resource_dir] or [[:], []]  -- [] leaves --cna_resource_dir
-    //   unset, so ClairS-TO uses the GRCh38 set inside the image
+    // clairsto_cna_channel: [meta, cna_resource_dir] or [[:], []]  -- [] uses the image's own set
 
     downloaded_clair3_models = PREPARE_REFERENCE_FILES.out.downloaded_clair3_models
     // downloaded_clair3_models: [meta(id=clair3_model_name), model_dir]
@@ -336,10 +324,8 @@ workflow LRSOMATIC {
 
     }
 
-    // Each replicate is aligned separately so that minimap2 can tag its reads with a
-    // unique @RG (sample + type + replicate).  Replicates are merged after alignment.
-    // ch_samplesheet is [meta_with_replicate, [bam]] -- one item per replicate per sample.
-    // ch_ubams defaults to ch_samplesheet; the fiber-seq block below may override it.
+    // Each replicate is aligned separately so minimap2 can tag its reads with a unique @RG, then
+    // merged. ch_ubams defaults to ch_samplesheet; the fiber-seq block below may override it.
     ch_ubams = ch_samplesheet
 
     vep_cache = channel.empty()
@@ -1233,10 +1219,8 @@ workflow LRSOMATIC {
     }
 
     //
-    // Collate software versions from two sources:
-    //   1. ch_versions (classic path): version YAML files emitted by modules
-    //   2. channel.topic("versions") (topic channel path): version tuples [process, tool, version]
-    //      emitted directly by modules that use the topic-channel pattern
+    // Collate software versions from ch_versions (YAML files) and channel.topic("versions")
+    // (tuples emitted directly by modules using the topic-channel pattern)
     //
     def topic_versions = channel.topic("versions")
         .distinct()  // deduplicate identical version entries across samples

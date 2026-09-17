@@ -18,8 +18,7 @@ workflow TUMORONLY_SMALLVAR {
     clairsto_pon_channel // [ [pon_vcf_path, ...], [is_population_allele_flag, ...] ]
     //                       used by ClairS-TO to filter germline variants with population allele databases
     clairsto_cna_channel // [meta, cna_resource_dir] or [[:], []]
-    //                       Verdict's ASCAT loci/allele/GC set for this assembly; [] uses the
-    //                       GRCh38 set shipped inside the ClairS-TO image
+    //                       Verdict's ASCAT set; [] uses the one inside the ClairS-TO image
     ds_pon_channel       // [ [pon_vcf_path, ...] ] or [ [] ]
     //                       user-supplied DeepSomatic PON VCFs; empty list => container defaults
 
@@ -34,9 +33,8 @@ workflow TUMORONLY_SMALLVAR {
     deepvariant_ch = channel.empty()
     deepsomatic_ch = channel.empty()
 
-    // CLAIRS-TO: somatic AND germline variant calling from tumor-only BAM
-    // ClairS-TO uses a panel-of-normals / population allele database to separate somatic from germline
-    // Runs if either somatic or germline clair calling is requested (produces both jointly)
+    // CLAIRS-TO: somatic AND germline calling from a tumor-only BAM, separated with a
+    // panel-of-normals. Runs if either somatic or germline clair calling is requested.
 
     if(somatic_var_keep.contains('clair') || germline_var_keep.contains('clair')) {
         // Append model name and PoN info to build the full CLAIRSTO input
@@ -63,8 +61,7 @@ workflow TUMORONLY_SMALLVAR {
         )
 
         // SPLIT CLAIRSTO GERMLINE AND SOMATIC VARIATION
-        // ClairS-TO outputs a combined VCF with FILTER tags indicating somatic/germline status;
-        // VCFSPLIT separates these into two VCFs
+        // ClairS-TO tags somatic/germline status in FILTER; VCFSPLIT splits on it
 
         CLAIRSTO.out.indel_vcf
                     .join(CLAIRSTO.out.snv_vcf)

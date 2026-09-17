@@ -154,11 +154,8 @@ workflow PIPELINE_INITIALISATION {
         }
         .set { ch_samplesheet }
 
-    // Count replicates per sample+type and embed the count in meta as n_replicates.
-    // This allows downstream groupTuple() to use groupKey() for eager per-sample release
-    // instead of waiting for ALL samples to finish (global synchronization barrier).
-    // This groupTuple is safe: the source is a fully-materialized list from
-    // samplesheetToList(), so the channel closes immediately without blocking any process.
+    // n_replicates lets downstream groupTuple() use groupKey() for eager per-sample release. This
+    // groupTuple is safe: samplesheetToList() is already materialised, so the channel closes at once.
     ch_samplesheet
         .map { meta, bams -> [[meta.id, meta.type], meta, bams] }
         .groupTuple(by: 0)
@@ -401,10 +398,8 @@ def vepPluginIndex(data_param) {
 //
 // Whether a resource still has to be reshaped before VEP can read it
 //
-// Only REVEL and EVE are ever prepared, and the test is for what a prepared file looks like --
-// bgzipped, so revel_grch38.tsv.gz or eve_merged.vcf.gz -- rather than for a release zip. EVE's
-// documented download endpoint ends in a bare '/', so keying on '.zip' would take that URL for a
-// finished file and then demand an index for it that cannot exist.
+// Only REVEL and EVE are ever prepared, and the test is for what a prepared file looks like
+// (bgzipped) rather than for a release zip: EVE's download endpoint ends in a bare '/'.
 //
 def vepPluginNeedsPrep(data_param) {
     def value = vepPluginResource(data_param)
@@ -474,10 +469,8 @@ def validateVepPluginParams() {
         error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. ${target} --vep_alphamissense instead.")
     }
 
-    // The VEP module rewrites the first '--custom file=' in ext.args to the staged --vep_custom file.
-    // ext.args is vep_args plus the plugin args, so a user with no '--custom file=' of their own would
-    // have the ClinVar entry rewritten instead -- their VCF annotated under ClinVar's short_name and
-    // fields, with ClinVar itself silently gone.
+    // The VEP module rewrites the first '--custom file=' in ext.args to the staged --vep_custom
+    // file, so without this placeholder a user's own VCF would take ClinVar's entry.
     if (params.vep_custom && !(params.vep_args =~ /--custom file=/)) {
         error("--vep_custom: needs a matching '--custom file=...' entry in --vep_args, which is where the staged file is substituted in. Add one, e.g. --vep_args '${params.vep_args} --custom file=placeholder,short_name=MyTrack,format=vcf,type=exact,coords=0'.")
     }
@@ -646,11 +639,8 @@ def methodsDescriptionText(mqc_methods_yaml) {
 //
 // Validate a user-supplied Verdict CNA resource directory, returning it as a file object
 //
-// ClairS-TO resolves loci_files/<prefix>chr1.txt, allele_files/<prefix>chr1.txt and one GC_*.txt
-// from this directory and accepts exactly one candidate for each. The directory is staged into the
-// task on its own, so a link reaching outside it resolves to nothing inside the container: Verdict
-// is then quietly disabled, which is the failure this resource set exists to prevent. Catch it
-// here, where the message can name the fix.
+// ClairS-TO accepts exactly one <prefix>chr1.txt per sub-directory and one GC_*.txt, and only the
+// directory itself is staged into the task, so a link out of it leaves Verdict quietly disabled.
 //
 def validateClairstoCnaResources(resource_dir) {
     def dir = file(resource_dir, type: 'dir')

@@ -2,11 +2,8 @@ process CLAIRSTO {
     tag "$meta.id"
     label 'process_very_high'
 
-    // Conda is not supported: the image is the fork that lets Verdict resolve its CNA resources
-    // from --cna_resource_dir instead of hardcoded GRCh38 names, so it can run against another
-    // assembly (e.g. T2T-CHM13). It also checks the loci against --ref_fn, makes the replication
-    // timing file optional, and fixes the GC window selection. Return to docker.io/hkubal/clairs-to
-    // once HKU-BAL/ClairS-TO carries these changes.
+    // Fork of ClairS-TO 0.5.1 that resolves Verdict's CNA resources from --cna_resource_dir
+    // instead of hardcoded GRCh38 names. No conda build; revert once upstream carries it.
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
         ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13'
         : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13'}"
@@ -15,8 +12,7 @@ process CLAIRSTO {
     tuple val(meta), path(tumor_bam), path(tumor_bai), val(model), path(pon_vcfs), val(pon_flags)
     tuple val(meta2), path(reference)
     tuple val(meta3), path(index)
-    // Verdict's ASCAT loci/allele/GC set for the assembly the BAM was aligned to, or [] to use the
-    // GRCh38 set shipped inside the image. Built by CLAIRSTO_CNA_RESOURCES.
+    // Verdict's ASCAT set for this assembly, from CLAIRSTO_CNA_RESOURCES; [] uses the image's own
     tuple val(meta4), path(cna_resources)
 
     output:
@@ -32,11 +28,9 @@ process CLAIRSTO {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
-    // The launcher activates its own conda environment, which it cannot locate for itself inside a
-    // read-only image; apptainer needs this as much as singularity does.
+    // The launcher cannot locate its own conda environment inside a read-only image
     def conda_prefix = (workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') ? '--conda_prefix /opt/micromamba/envs/clairs-to' : ''
-    // Omitted for GRCh38, where the image's own resource set is the right one. A set that cannot
-    // belong to --ref_fn makes ClairS-TO disable Verdict with a warning rather than mistag.
+    // Omitted for GRCh38; a set that cannot belong to --ref_fn disables Verdict with a warning
     def cna_resource_dir = cna_resources ? "--cna_resource_dir ${cna_resources}" : ''
     def pon_string   = pon_vcfs.join(',')
     def flags_string = pon_flags.join(',')
@@ -55,11 +49,8 @@ process CLAIRSTO {
         $cna_resource_dir \\
         $args
 
-    # From 0.5.1 the output VCFs are named after --sample_name (snv_<sample>.vcf.gz), and the
-    # prefix cannot be forced back to the bare form: ClairS-TO rewrites --snv_output_prefix
-    # whenever its value is still the default. Rename here so the published names, VCFSPLIT and
-    # the samples' output directories stay as they were. Globbed rather than rebuilt from the
-    # prefix, because ClairS-TO sanitises the sample name before using it in a path.
+    # 0.5.1 names the VCFs after --sample_name and ignores --snv_output_prefix while it holds its
+    # default. Rename back, globbed because ClairS-TO sanitises the sample name inside the path.
     mv -- snv_*.vcf.gz snv.vcf.gz
     mv -- snv_*.vcf.gz.tbi snv.vcf.gz.tbi
     mv -- indel_*.vcf.gz indel.vcf.gz

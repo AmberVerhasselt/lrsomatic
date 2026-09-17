@@ -8,7 +8,7 @@ process CLAIRSTO_CNA_RESOURCES {
         : 'community.wave.seqera.io/library/coreutils_grep_gzip_lbzip2_pruned:838ba80435a629f8'}"
 
     input:
-    // The same ASCAT loci/allele/GC set the ASCAT subworkflow uses, already unzipped.
+    // The same ASCAT loci/allele/GC set the ASCAT subworkflow uses, already unzipped
     tuple val(meta), path(loci, stageAs: 'loci/*'), path(alleles, stageAs: 'alleles/*'), path(gc, stageAs: 'gc/*')
 
     output:
@@ -23,14 +23,12 @@ process CLAIRSTO_CNA_RESOURCES {
     """
     mkdir -p cna_resources/loci_files cna_resources/allele_files
 
-    # Real files rather than links. This directory is staged into CLAIRSTO on its own, so a link
-    # pointing back into this task's inputs would dangle inside that container.
+    # Real files: only this directory is staged into CLAIRSTO, so links out of it would dangle
     cp -L loci/* cna_resources/loci_files/
     cp -L alleles/* cna_resources/allele_files/
 
-    # ClairS-TO derives the per-contig prefixes from the single file ending in chr1.txt in each
-    # sub-directory and takes exactly one GC_*.txt at the top, so a second candidate is an error
-    # there rather than a silent choice. Fail here instead, where the message can be useful.
+    # ClairS-TO takes exactly one GC_*.txt and errors on a second candidate. Fail here instead,
+    # where the message can name the files.
     n_gc=\$(ls -1 gc/ | wc -l)
     if [ "\$n_gc" -ne 1 ]; then
         echo "ERROR: expected exactly one GC content file, found \$n_gc:" >&2
@@ -44,9 +42,8 @@ process CLAIRSTO_CNA_RESOURCES {
         *)        cp -L "gc/\$gc_src" "cna_resources/GC_${prefix}.txt" ;;
     esac
 
-    # No RT_*.txt is written, deliberately: Verdict then corrects LogR for GC content only, as
-    # ASCAT does when given no replication timing file. Lifting the GRCh38 timings over to CHM13
-    # changes essentially nothing and is poorly anchored on the acrocentric contigs.
+    # No RT_*.txt, deliberately: Verdict then corrects LogR for GC content only, which is what
+    # ClairS-TO recommends for CHM13.
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
