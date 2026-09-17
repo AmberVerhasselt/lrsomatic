@@ -294,7 +294,9 @@ workflow LRSOMATIC {
                 .join( PREPARE_REFERENCE_FILES.out.allele_files.map { files -> [ cna_key, files ] } )
                 .join( PREPARE_REFERENCE_FILES.out.gc_file.map { files -> [ cna_key, files ] } )
         )
-        clairsto_cna_channel = CLAIRSTO_CNA_RESOURCES.out.cna_resources
+        // .first(): a process output is a queue channel, and CLAIRSTO would then run for only
+        // the first tumour-only sample.
+        clairsto_cna_channel = CLAIRSTO_CNA_RESOURCES.out.cna_resources.first()
         ch_versions = ch_versions.mix(CLAIRSTO_CNA_RESOURCES.out.versions)
     }
     else {
