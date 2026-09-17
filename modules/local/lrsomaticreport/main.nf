@@ -49,9 +49,11 @@ process LRSOMATICREPORT {
     """ : ''
 
     """
-    # Quarto/Deno write under \$HOME and \$TMPDIR, which clusters may mount read-only
+    # Quarto/Deno write under \$HOME, \$TMPDIR and \$XDG_CACHE_HOME (preferred over \$HOME/.cache).
+    # Apptainer inherits the host environment, so a cache dir outside the bound work tree reads as
+    # read-only inside the container and the render dies; point all of them at the task directory.
     export HOME=\$PWD
-    export TMPDIR=\$PWD/tmp TMP=\$PWD/tmp TEMP=\$PWD/tmp
+    export TMPDIR=\$PWD/tmp TMP=\$PWD/tmp TEMP=\$PWD/tmp XDG_CACHE_HOME=\$PWD/.cache
     mkdir -p "\$TMPDIR"
 
     mkdir -p sample_dir

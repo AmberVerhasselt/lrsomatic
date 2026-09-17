@@ -263,8 +263,9 @@ applies to.
 | `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered |
 
 The report is rendered by [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report)
-running from `ghcr.io/ljwharbers/lrsomatic-report:1.5.0`, or
-`oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.5.0` under Singularity/Apptainer. The tool
+running from `ghcr.io/ljwharbers/lrsomatic-report`, or
+`ghcr.io/ljwharbers/lrsomatic-report-sif` under Singularity/Apptainer, both pinned to a tag in
+[`modules/local/lrsomaticreport/main.nf`](../modules/local/lrsomaticreport/main.nf). The tool
 ships inside the image rather than in this repository, so updating it is a container tag bump.
 Images are built for `linux/amd64` only. **Conda is not supported for this step** —
 `LRSOMATICREPORT` stops with an error under `-profile conda`/`mamba`; use `--skip_report`
