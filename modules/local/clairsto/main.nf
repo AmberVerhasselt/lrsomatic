@@ -54,6 +54,16 @@ process CLAIRSTO {
         $conda_prefix \\
         $cna_resource_dir \\
         $args
+
+    # From 0.5.1 the output VCFs are named after --sample_name (snv_<sample>.vcf.gz), and the
+    # prefix cannot be forced back to the bare form: ClairS-TO rewrites --snv_output_prefix
+    # whenever its value is still the default. Rename here so the published names, VCFSPLIT and
+    # the samples' output directories stay as they were. Globbed rather than rebuilt from the
+    # prefix, because ClairS-TO sanitises the sample name before using it in a path.
+    mv -- snv_*.vcf.gz snv.vcf.gz
+    mv -- snv_*.vcf.gz.tbi snv.vcf.gz.tbi
+    mv -- indel_*.vcf.gz indel.vcf.gz
+    mv -- indel_*.vcf.gz.tbi indel.vcf.gz.tbi
     """
 
     stub:
