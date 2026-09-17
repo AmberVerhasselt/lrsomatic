@@ -284,12 +284,15 @@ workflow LRSOMATIC {
     // prepared directory was supplied, or when the image's own GRCh38 set is the right one.
     //
     if (build_clairsto_cna) {
-        // Each of these emits once, already collected into a list of paths, so merge lines them
-        // up positionally into a single [loci, alleles, gc] tuple.
+        // Each of these emits once, and that one item is itself a list of paths. merge() and
+        // combine() would flatten the three lists into a single run of files, so key them on a
+        // shared meta and join: join appends the non-key part of each as one element, leaving
+        // [meta, [loci...], [alleles...], [gc]].
+        cna_key = [ id: params.genome ]
         CLAIRSTO_CNA_RESOURCES(
-            PREPARE_REFERENCE_FILES.out.loci_files
-                .merge(PREPARE_REFERENCE_FILES.out.allele_files, PREPARE_REFERENCE_FILES.out.gc_file)
-                .map { loci, alleles, gc -> [ [ id: params.genome ], loci, alleles, gc ] }
+            PREPARE_REFERENCE_FILES.out.loci_files.map { files -> [ cna_key, files ] }
+                .join( PREPARE_REFERENCE_FILES.out.allele_files.map { files -> [ cna_key, files ] } )
+                .join( PREPARE_REFERENCE_FILES.out.gc_file.map { files -> [ cna_key, files ] } )
         )
         clairsto_cna_channel = CLAIRSTO_CNA_RESOURCES.out.cna_resources
         ch_versions = ch_versions.mix(CLAIRSTO_CNA_RESOURCES.out.versions)
