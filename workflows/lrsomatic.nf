@@ -12,6 +12,7 @@ include { getGenomeAttribute     } from '../subworkflows/local/utils_nfcore_lrso
 include { reportGenePanelTokens  } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { reportGenePanelIsFile  } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { resolveVepPlugins; validateVepPluginParams } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
+include { validateClairstoCnaResources } from '../subworkflows/local/utils_nfcore_lrsomatic_pipeline'
 include { PREPARE_VEP_PLUGINS    } from '../subworkflows/local/prepare_vep_plugins'
 
 //
@@ -29,6 +30,7 @@ include { MOSDEPTH                          } from '../modules/nf-core/mosdepth/
 include { ASCAT                             } from '../modules/nf-core/ascat/main'
 include { SEVERUS                           } from '../modules/nf-core/severus/main.nf'
 include { METAEXTRACT                       } from '../modules/local/metaextract/main'
+include { CLAIRSTO_CNA_RESOURCES            } from '../modules/local/clairsto/cna_resources/main'
 include { WAKHAN                            } from '../modules/local/wakhan/main'
 include { LRSOMATICREPORT                   } from '../modules/local/lrsomaticreport/main'
 include { FIBERTOOLSRS_PREDICTM6A           } from '../modules/local/fibertoolsrs/predictm6a'
@@ -179,6 +181,17 @@ workflow LRSOMATIC {
     //   -- single tuple of parallel lists; each flag indicates whether the corresponding VCF
     //      is a population allele database (True) vs. a panel-of-normals artefact file (False)
 
+    // ClairS-TO's Verdict module resolves its ASCAT loci/allele/GC set from --cna_resource_dir.
+    // The image ships the GRCh38 set, so resources are only needed when the reference is another
+    // assembly. A prepared directory can be named instead, which also allows a set carrying an
+    // RT_*.txt; without one, Verdict corrects LogR for GC content only, as ASCAT does.
+    clairsto_cna_dir = params.clairsto_cna_resources
+        ? validateClairstoCnaResources(params.clairsto_cna_resources)
+        : null
+    // Built from the assembly's own ASCAT files only when no directory was supplied. CHM13 has no
+    // ascat_loci_rt attribute, so the built set is GC-only by construction.
+    build_clairsto_cna = clairsto_cna_dir == null && params.genome == 'CHM13'
+
     // DeepSomatic PON channel: user-supplied VCF paths, or empty list (process falls back to container defaults)
     ds_pon_files = params.deepsomatic_pon_vcfs != null
         ? params.deepsomatic_pon_vcfs.split(',').collect { f -> file(f.trim()) }
@@ -260,9 +273,32 @@ workflow LRSOMATIC {
         params.ascat_loci_files,
         params.ascat_gc_file,
         params.ascat_rt_file,
+        build_clairsto_cna,
         basecall_meta,
         clair3_modelMap
     )
+
+    //
+    // MODULE: CLAIRSTO_CNA_RESOURCES (label: process_single)
+    // Lays the ASCAT loci/allele/GC set out as the directory Verdict expects. Skipped when a
+    // prepared directory was supplied, or when the image's own GRCh38 set is the right one.
+    //
+    if (build_clairsto_cna) {
+        // Each of these emits once, already collected into a list of paths, so merge lines them
+        // up positionally into a single [loci, alleles, gc] tuple.
+        CLAIRSTO_CNA_RESOURCES(
+            PREPARE_REFERENCE_FILES.out.loci_files
+                .merge(PREPARE_REFERENCE_FILES.out.allele_files, PREPARE_REFERENCE_FILES.out.gc_file)
+                .map { loci, alleles, gc -> [ [ id: params.genome ], loci, alleles, gc ] }
+        )
+        clairsto_cna_channel = CLAIRSTO_CNA_RESOURCES.out.cna_resources
+        ch_versions = ch_versions.mix(CLAIRSTO_CNA_RESOURCES.out.versions)
+    }
+    else {
+        clairsto_cna_channel = channel.value( [ [:], clairsto_cna_dir ?: [] ] )
+    }
+    // clairsto_cna_channel: [meta, cna_resource_dir] or [[:], []]  -- [] leaves --cna_resource_dir
+    //   unset, so ClairS-TO uses the GRCh38 set inside the image
 
     downloaded_clair3_models = PREPARE_REFERENCE_FILES.out.downloaded_clair3_models
     // downloaded_clair3_models: [meta(id=clair3_model_name), model_dir]
@@ -573,6 +609,7 @@ workflow LRSOMATIC {
         ch_fasta,
         ch_fai,
         clairsto_pon_channel,
+        clairsto_cna_channel,
         ds_pon_channel
     )
 

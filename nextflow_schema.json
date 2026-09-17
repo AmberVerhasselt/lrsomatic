@@ -162,6 +162,13 @@
                     "fa_icon": "fas fa-ban",
                     "hidden": true,
                     "default": "s3://ngi-igenomes/igenomes/"
+                },
+                "clairsto_cna_resources": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Verdict CNA resource directory for ClairS-TO, holding loci_files/, allele_files/ and one GC_*.txt.",
+                    "help_text": "ClairS-TO's Verdict module tags tumour-only calls as germline or somatic using ASCAT loci, allele and GC content files built on the assembly the BAM was aligned to. The image ships the GRCh38 set, and with `--genome CHM13` the pipeline builds a CHM13 set from the ASCAT files it already downloads, so this is only needed for another assembly or to override either. The directory must be self-contained: it is staged into the task on its own, so links reaching outside it would be missing inside the container. Add an `RT_<name>.txt` to correct LogR for replication timing as well as GC content; without one, correction is GC-only, as ASCAT does and as ClairS-TO recommends for CHM13.",
+                    "fa_icon": "fas fa-folder-open"
                 }
             }
         },

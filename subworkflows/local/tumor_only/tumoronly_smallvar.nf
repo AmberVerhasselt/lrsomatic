@@ -17,6 +17,9 @@ workflow TUMORONLY_SMALLVAR {
     fai                  // [[:], fai]
     clairsto_pon_channel // [ [pon_vcf_path, ...], [is_population_allele_flag, ...] ]
     //                       used by ClairS-TO to filter germline variants with population allele databases
+    clairsto_cna_channel // [meta, cna_resource_dir] or [[:], []]
+    //                       Verdict's ASCAT loci/allele/GC set for this assembly; [] uses the
+    //                       GRCh38 set shipped inside the ClairS-TO image
     ds_pon_channel       // [ [pon_vcf_path, ...] ] or [ [] ]
     //                       user-supplied DeepSomatic PON VCFs; empty list => container defaults
 
@@ -48,14 +51,15 @@ workflow TUMORONLY_SMALLVAR {
         //
         // MODULE: CLAIRSTO (label: process_high)
         // Input:  [meta, bam, bai, model_str, [pon_vcfs], [pon_flags]]
-        //         fasta / fai
+        //         fasta / fai / Verdict CNA resource directory
         // Output: .snv_vcf   -- [meta, vcf]  -- SNV calls (germline + somatic, unsplit)
         //         .indel_vcf -- [meta, vcf]  -- indel calls (germline + somatic, unsplit)
         //
         CLAIRSTO (
             clairsto_input_ch,
             fasta,
-            fai
+            fai,
+            clairsto_cna_channel
         )
 
         // SPLIT CLAIRSTO GERMLINE AND SOMATIC VARIATION

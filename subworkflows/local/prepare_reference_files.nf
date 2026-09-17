@@ -18,6 +18,8 @@ workflow PREPARE_REFERENCE_FILES {
         ascat_loci      // str: path to ASCAT loci files (directory or .zip), or null
         ascat_loci_gc   // str: path to ASCAT GC correction file (.zip or direct), or null
         ascat_loci_rt   // str: path to ASCAT RT correction file (.zip or direct), or null
+        clairsto_cna    // bool: ClairS-TO also needs the loci/allele/GC set, to build a Verdict
+                        //       CNA resource directory for a non-GRCh38 assembly
         basecall_meta   // [meta, basecall_model_str, kinetics_str]  -- from METAEXTRACT per sample
         clair3_modelMap // Map<basecall_model_str, clair3_model_name>  -- used to resolve download URLs
 
@@ -108,7 +110,11 @@ workflow PREPARE_REFERENCE_FILES {
         // Each file set can be provided as a .zip archive or a plain directory/file path
         // All ASCAT outputs are flat file collections (no meta tuple) for use with ASCAT module
         //
-        if ( !params.skip_ascat ) {
+        // The loci, allele and GC set is shared with ClairS-TO: Verdict needs the same files, laid
+        // out as a CNA resource directory, whenever the assembly is not the GRCh38 one shipped in
+        // its image. The replication timing file is ASCAT's alone and stays behind the ASCAT gate,
+        // because Verdict is deliberately run with GC-only correction.
+        if ( !params.skip_ascat || clairsto_cna ) {
             // Allele files: per-chromosome SNP allele frequency files (used for LogR/BAF calculation)
             if (!ascat_alleles) allele_files = channel.empty()
             else if (ascat_alleles.endsWith(".zip")) {
@@ -140,7 +146,9 @@ workflow PREPARE_REFERENCE_FILES {
                 // gc_file: [path, ...]  -- GC correction file(s) collected
                 ch_versions = ch_versions.mix(UNZIP_GC.out.versions)
             } else gc_file = channel.fromPath(ascat_loci_gc).collect()
+        }
 
+        if ( !params.skip_ascat ) {
             // Replication timing correction file: RT correction per locus (optional)
             if (!ascat_loci_rt) rt_file = channel.value([])
             else if (ascat_loci_rt.endsWith(".zip")) {

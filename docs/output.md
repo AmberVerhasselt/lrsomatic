@@ -312,6 +312,8 @@ Present in **tumor-only** samples (no matched normal).
 | `somatic.vcf.gz`      | SNV and indel calls marked as PASS and without a germline tag         |
 | `somatic.vcf.gz.tbi`  | Index for somatic small variant calls                                 |
 
+The germline/somatic split comes from two assembly-specific sources: a panel of normals of population allele databases, and ClairS-TO's Verdict module, which infers copy number and tumour purity and tags each call as germline, somatic or subclonal somatic. Both are supplied for GRCh38 and CHM13, so the split is assembly-correct on either. Verdict only applies tags when the estimated tumour purity is at most 0.6, and it is disabled — with a warning in the ClairS-TO log — if its reference resources cannot belong to the reference the BAM was aligned to. When it is disabled, germline calls are separated by the panel of normals alone and more of them reach `somatic.vcf.gz`. See [CHM13 support](usage.md#chm13-support) in the usage docs.
+
 #### `severus`
 
 ```

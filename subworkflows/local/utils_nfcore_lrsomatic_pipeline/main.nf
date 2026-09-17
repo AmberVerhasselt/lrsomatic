@@ -642,3 +642,58 @@ def methodsDescriptionText(mqc_methods_yaml) {
 
     return description_html.toString()
 }
+
+//
+// Validate a user-supplied Verdict CNA resource directory, returning it as a file object
+//
+// ClairS-TO resolves loci_files/<prefix>chr1.txt, allele_files/<prefix>chr1.txt and one GC_*.txt
+// from this directory and accepts exactly one candidate for each. The directory is staged into the
+// task on its own, so a link reaching outside it resolves to nothing inside the container: Verdict
+// is then quietly disabled, which is the failure this resource set exists to prevent. Catch it
+// here, where the message can name the fix.
+//
+def validateClairstoCnaResources(resource_dir) {
+    def dir = file(resource_dir, type: 'dir')
+    if (!dir.exists() || !dir.isDirectory()) {
+        error("--clairsto_cna_resources: '${resource_dir}' is not a directory.")
+    }
+
+    ['loci_files', 'allele_files'].each { sub ->
+        def sub_dir = dir.resolve(sub)
+        if (!sub_dir.exists() || !sub_dir.isDirectory()) {
+            error("--clairsto_cna_resources: '${resource_dir}' has no ${sub}/ sub-directory. Expected layout: loci_files/<prefix>chr1.txt ..., allele_files/<prefix>chr1.txt ..., GC_<name>.txt, and optionally RT_<name>.txt.")
+        }
+        def first_contig = sub_dir.listFiles().findAll { entry -> entry.name.endsWith('chr1.txt') && entry.name.size() > 'chr1.txt'.size() }
+        if (first_contig.size() != 1) {
+            error("--clairsto_cna_resources: ${sub}/ holds ${first_contig.size()} files ending in 'chr1.txt'; ClairS-TO derives the per-contig prefix from exactly one. Keep one resource set per directory.")
+        }
+    }
+
+    def gc_files = dir.listFiles().findAll { entry -> entry.name.startsWith('GC_') && entry.name.endsWith('.txt') }
+    if (gc_files.size() != 1) {
+        error("--clairsto_cna_resources: '${resource_dir}' holds ${gc_files.size()} files matching GC_*.txt; ClairS-TO needs exactly one.")
+    }
+
+    def real_root = dir.toRealPath()
+    def unusable = []
+    [dir, dir.resolve('loci_files'), dir.resolve('allele_files')].each { sub_dir ->
+        sub_dir.listFiles().each { entry ->
+            if (java.nio.file.Files.isSymbolicLink(entry)) {
+                try {
+                    if (!entry.toRealPath().startsWith(real_root)) {
+                        unusable << entry.name
+                    }
+                }
+                catch (java.io.IOException _e) {
+                    // dangling link: unusable for the same reason
+                    unusable << entry.name
+                }
+            }
+        }
+    }
+    if (unusable) {
+        error("--clairsto_cna_resources: '${resource_dir}' contains links pointing outside the directory (e.g. ${unusable.take(3).join(', ')}). Only the directory itself is staged into the task, so those files would be missing inside the container and Verdict would be disabled. Materialise a self-contained copy first, e.g. `cp -rL ${resource_dir} <dest>`, and pass that.")
+    }
+
+    return dir
+}
