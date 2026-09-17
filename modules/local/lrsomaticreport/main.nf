@@ -8,8 +8,8 @@ process LRSOMATICREPORT {
     // package once the recipe at github.com/ljwharbers/lrsomatic_report/tree/main/recipe is merged.
     // Updating the tool is a tag bump here: tag upstream, let its container workflow build, edit these two lines.
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
-        ? 'oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.5.1'
-        : 'ghcr.io/ljwharbers/lrsomatic-report:1.5.1'}"
+        ? 'oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.6.0'
+        : 'ghcr.io/ljwharbers/lrsomatic-report:1.6.0'}"
 
     input:
     // Every path input is optional (`[]` when skipped); tumor/normal QC stage into separate dirs because a matched pair shares meta.id
