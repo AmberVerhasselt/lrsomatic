@@ -23,23 +23,26 @@ process CLAIRSTO_CNA_RESOURCES {
     """
     mkdir -p cna_resources/loci_files cna_resources/allele_files
 
-    # Real files: only this directory is staged into CLAIRSTO, so links out of it would dangle
-    cp -L loci/* cna_resources/loci_files/
-    cp -L alleles/* cna_resources/allele_files/
+    # Recursive: a set unzipped from an archive arrives as one directory holding the
+    # per-contig files, while one given as a plain path arrives as the files themselves.
+    # Real files either way -- only this directory is staged into CLAIRSTO, so links out of
+    # it would dangle.
+    find -L loci -type f -exec cp -L -t cna_resources/loci_files/ {} +
+    find -L alleles -type f -exec cp -L -t cna_resources/allele_files/ {} +
 
     # ClairS-TO takes exactly one GC_*.txt and errors on a second candidate. Fail here instead,
     # where the message can name the files.
-    n_gc=\$(ls -1 gc/ | wc -l)
+    n_gc=\$(find -L gc -type f | wc -l)
     if [ "\$n_gc" -ne 1 ]; then
         echo "ERROR: expected exactly one GC content file, found \$n_gc:" >&2
-        ls -1 gc/ >&2
+        find -L gc -type f >&2
         exit 1
     fi
 
-    gc_src=\$(ls -1 gc/)
-    case "\$gc_src" in
-        GC_*.txt) cp -L "gc/\$gc_src" "cna_resources/\$gc_src" ;;
-        *)        cp -L "gc/\$gc_src" "cna_resources/GC_${prefix}.txt" ;;
+    gc_src=\$(find -L gc -type f)
+    case "\$(basename "\$gc_src")" in
+        GC_*.txt) cp -L "\$gc_src" "cna_resources/\$(basename "\$gc_src")" ;;
+        *)        cp -L "\$gc_src" "cna_resources/GC_${prefix}.txt" ;;
     esac
 
     # No RT_*.txt, deliberately: Verdict then corrects LogR for GC content only, which is what

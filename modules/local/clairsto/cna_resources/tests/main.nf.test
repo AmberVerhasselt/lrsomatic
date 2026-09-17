@@ -58,6 +58,42 @@ nextflow_process {
         }
     }
 
+    // What the pipeline actually hands over for CHM13: UNZIP emits its output directory, and
+    // these archives hold a folder of the same name, so the collected channel is that one
+    // nested directory rather than the per-contig files. ASCAT consumes the same shape.
+    test("set arrives as one directory - per-contig files are found inside it") {
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id:'CHM13' ],
+                    [ file("${projectDir}/modules/local/clairsto/cna_resources/tests/fixtures/loci_dir/G1000_loci_CHM13", checkIfExists: true) ],
+                    [ file("${projectDir}/modules/local/clairsto/cna_resources/tests/fixtures/alleles_dir/G1000_alleles_CHM13", checkIfExists: true) ],
+                    [ file("${projectDir}/modules/local/clairsto/cna_resources/tests/fixtures/gc/GCcontent_SNPloci_CHM13.txt", checkIfExists: true) ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def dir  = new File(process.out.cna_resources[0][1].toString())
+            def root = dir.list().sort()
+
+            assertAll(
+                // Flattened out of the nested directory, not left one level down
+                { assert new File(dir, 'loci_files').list().sort() ==
+                    ['G1000_loci_CHM13_chr1.txt', 'G1000_loci_CHM13_chr2.txt'] },
+                { assert new File(dir, 'allele_files').list().sort() ==
+                    ['G1000_alleles_CHM13_chr1.txt', 'G1000_alleles_CHM13_chr2.txt'] },
+
+                { assert root == ['GC_CHM13.txt', 'allele_files', 'loci_files'] }
+            )
+        }
+    }
+
     // A GC file already named GC_*.txt keeps its name, so the GRCh38 set resolves as before
     test("GC file already named GC_*.txt - name is preserved") {
 
