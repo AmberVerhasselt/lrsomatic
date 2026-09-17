@@ -87,7 +87,7 @@ CD3E	chr11	118321077	118332499	sv	lymphoid
 CD3D	chr11	118355312	118359063	sv	lymphoid
 CD3G	chr11	118360702	118371513	sv	lymphoid
 KMT2A	chr11	118455758	118546121	sv	lymphoid
-RCK	chr11	118766827	118810815	sv	lymphoid
+DDX6	chr11	118766827	118810815	sv	lymphoid
 CBL	chr11	119226671	119334559	sv	lymphoid
 CCND2	chr12	4276533	4312135		lymphoid	OG
 ARID2	chr12	45688334	45867624	sv	lymphoid
@@ -158,7 +158,6 @@ EGR1				snv	lymphoid	TSG
 ELANE				snv	lymphoid	OG
 EP300				snv	lymphoid	TSG
 ETV6				snv	lymphoid	TSG/OG; TSG in T-ALL/PCNSL, OG in DLBCL/B-LBL
-FAM46C				snv	lymphoid	TSG
 FAS				snv	lymphoid	TSG
 FBXW7				snv	lymphoid	TSG
 FGFR3				snv	lymphoid	OG
@@ -201,7 +200,7 @@ PLCG1				snv	lymphoid	OG
 PLCG2				snv	lymphoid	OG
 POT1				snv	lymphoid	TSG
 PPM1D				snv	lymphoid	OG
-PRKBC				snv	lymphoid	OG
+PRKCB				snv	lymphoid	OG
 PRKD2				snv	lymphoid	OG
 PTPN11				snv	lymphoid	OG
 PTPRD				snv	lymphoid	TSG

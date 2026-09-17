@@ -299,6 +299,26 @@ error rather than a silently wrong filter. Symbol-only panels need no declaratio
 builtin panels ship one file per reference and are selected by their bare name
 (`lymphoid`, `sarcoma`), resolved against the detected reference.
 
+A panel may also carry an optional `applies_to` column, which scopes a gene to one of the two
+tables. A blank cell (or `both`) filters both, `snv` the small-variant table only, and `sv` the
+SV table only; values are case-insensitive and anything else is a hard error, so a typo cannot
+quietly change what is filtered. A panel with no `applies_to` column behaves exactly as it did
+before the column existed. Because an `snv` row is matched on its symbol alone, it may leave
+`chrom`/`start`/`end` empty — the all-or-nothing rule above applies to which **columns** the
+file carries, and a blank coordinate on a `sv` or blank-scoped row is still an error. The
+column is read by lrsomatic_report ≥ 1.6.0. See
+[`assets/gene_lists/README.md`](../assets/gene_lists/README.md) for the full format.
+
+> **The builtin `lymphoid` panel changed in the release that added this column.** It was rebuilt
+> from two curated NHL lists and went from 72 genes filtering both tables to 234 rows scoped per
+> table. The rearrangement partners (`IGH`, `IGK`, `IGL`, `TRA/D`, `TRB`, `TRG`, `DUSP22`) are in
+> the SV table for the first time; 106 coding genes — `MYD88` and `NOTCH1` among them — are
+> `snv`-scoped and so no longer match structural variants at all, meaning a whole-gene deletion
+> of `MYD88` does not appear in a `lymphoid`-filtered SV table; and 17 genes of the old panel
+> (`CD19`, `MS4A1`, `SOX11`, `FAT1`, `KLHL6`, `SPEN` among them) are gone. A run repeated across
+> this change with `--report_gene_panel lymphoid` gives materially different filtered tables.
+> `sarcoma` is unchanged.
+
 ```bash
 nextflow run IntGenomicsLab/lrsomatic \
     -profile <docker/singularity> \

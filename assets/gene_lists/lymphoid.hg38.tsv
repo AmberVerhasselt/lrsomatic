@@ -81,13 +81,13 @@ KDM2A	chr11	67119263	67258082	sv	lymphoid
 CCND1	chr11	69641156	69654474		lymphoid	OG
 BIRC3	chr11	102317450	102339403		lymphoid	TSG
 ATM	chr11	108223044	108369102		lymphoid	TSG
-SIK3	chr11	116858511	117113708	sv	lymphoid
+SIK3	chr11	116843402	117098437	sv	lymphoid
 PAFAH1B2	chr11	117144284	117178173	sv	lymphoid
 CD3E	chr11	118304730	118316175	sv	lymphoid
 CD3D	chr11	118338954	118342705	sv	lymphoid
 CD3G	chr11	118344344	118355161	sv	lymphoid
 KMT2A	chr11	118436456	118526832	sv	lymphoid
-RCK	chr11	118747763	118791744	sv	lymphoid
+DDX6	chr11	118747763	118791744	sv	lymphoid
 CBL	chr11	119206298	119313926	sv	lymphoid
 CCND2	chr12	4269771	4305353		lymphoid	OG
 ARID2	chr12	45729706	45908040	sv	lymphoid
@@ -116,7 +116,7 @@ IL4R	chr16	27313668	27364778		lymphoid	OG
 IRF8	chr16	85899116	85922609		lymphoid	TSG
 CBFA2T3	chr16	88874858	88977207	sv	lymphoid
 TP53	chr17	7661779	7687538		lymphoid	TSG
-KDM6B	chr17	7738322	7760122	sv	lymphoid
+KDM6B	chr17	7834217	7854796	sv	lymphoid
 NCOR1	chr17	16029065	16218185	sv	lymphoid
 STAT3	chr17	42313324	42388568		lymphoid	OG
 TBX21	chr17	47733236	47746122	sv	lymphoid
@@ -128,7 +128,7 @@ CCNE1	chr19	29811991	29824312	sv	lymphoid
 BCL3	chr19	44747705	44760044	sv	lymphoid
 SPIB	chr19	50418938	50431314	sv	lymphoid
 IGL	chr22	22026076	22922913	sv	lymphoid
-EWSR1	chr22	29731500	29763945	sv	lymphoid
+EWSR1	chr22	29268009	29300525	sv	lymphoid
 SH3KBP1	chrX	19533977	19887600	sv	lymphoid
 GPR34	chrX	41688973	41697275		lymphoid	OG
 KDM6A	chrX	44873188	45112779		lymphoid	TSG
@@ -158,7 +158,6 @@ EGR1				snv	lymphoid	TSG
 ELANE				snv	lymphoid	OG
 EP300				snv	lymphoid	TSG
 ETV6				snv	lymphoid	TSG/OG; TSG in T-ALL/PCNSL, OG in DLBCL/B-LBL
-FAM46C				snv	lymphoid	TSG
 FAS				snv	lymphoid	TSG
 FBXW7				snv	lymphoid	TSG
 FGFR3				snv	lymphoid	OG
@@ -201,7 +200,7 @@ PLCG1				snv	lymphoid	OG
 PLCG2				snv	lymphoid	OG
 POT1				snv	lymphoid	TSG
 PPM1D				snv	lymphoid	OG
-PRKBC				snv	lymphoid	OG
+PRKCB				snv	lymphoid	OG
 PRKD2				snv	lymphoid	OG
 PTPN11				snv	lymphoid	OG
 PTPRD				snv	lymphoid	TSG

@@ -74,7 +74,7 @@ output:
       - "lrsomatic_report":
           type: string
           description: The name of the tool
-      - "render_report.R --version":
+      - "env -u R_HOME render_report.R --version":
           type: string
           description: The command used to generate the version of the tool
 
@@ -86,7 +86,7 @@ topics:
       - lrsomatic_report:
           type: string
           description: The name of the tool
-      - "render_report.R --version":
+      - "env -u R_HOME render_report.R --version":
           type: string
           description: The command used to generate the version of the tool
 

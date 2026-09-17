@@ -22,7 +22,10 @@ process LRSOMATICREPORT {
 
     output:
     tuple val(meta), path("*_report.html"), emit: report
-    tuple val("${task.process}"), val('lrsomatic_report'), eval('render_report.R --version'), topic: versions, emit: versions_lrsomaticreport
+    // `env -u R_HOME`: Apptainer forwards the host environment, and R prints
+    // "WARNING: ignoring environment value of R_HOME" on *stdout* when it is set, which would
+    // otherwise land in the captured version string. Docker does not forward it, so CI never sees this.
+    tuple val("${task.process}"), val('lrsomatic_report'), eval('env -u R_HOME render_report.R --version'), topic: versions, emit: versions_lrsomaticreport
 
     when:
     task.ext.when == null || task.ext.when

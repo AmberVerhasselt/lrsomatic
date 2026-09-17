@@ -113,7 +113,7 @@ report, so the reader can retick them without re-rendering.
 
 | File                      | Contents                                                                                                                                  |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `lymphoid.{hg38,t2t}.tsv` | 235 non-Hodgkin lymphoma genes, **scoped per table** — see below                                                                          |
+| `lymphoid.{hg38,t2t}.tsv` | 234 non-Hodgkin lymphoma genes, **scoped per table** — see below                                                                          |
 | `sarcoma.hg38.tsv`        | 140 soft-tissue and bone sarcoma genes — tumour suppressors, amplification targets and recurrent fusion partners — GENCODE v46 gene spans |
 | `sarcoma.t2t.tsv`         | the same 140 genes, spans from the CHM13v2.0 RefSeq Liftoff v5.1 annotation                                                               |
 
@@ -130,13 +130,13 @@ Merged from two curated NHL lists that are deliberately not interchangeable:
   coding-mutation content; its `TSG`/`OG` class and remarks are kept in `notes`.
 
 42 genes are on both lists and carry a blank `applies_to`; the 86 bed-only genes are `sv`
-and the 107 twist-only genes are `snv`, giving 235 rows. The beds are 4-column,
+and the 106 twist-only genes are `snv`, giving 234 rows. The beds are 4-column,
 headerless, CRLF and carry no trailing newline (`wc -l` reports 127 for 128 genes), and
 their coordinates are already 1-based inclusive gene spans in the same convention as the
 other builtins — no BED half-open conversion is applied. `TRA/D` is kept verbatim: it is
 not an HGNC symbol, but it is an `sv` row and so is matched positionally.
 
-One consequence worth stating: the 107 twist-only genes are `snv`-scoped, so a deletion
+One consequence worth stating: the 106 twist-only genes are `snv`-scoped, so a deletion
 that removes `MYD88` or `NOTCH1` entirely does not appear in the panel-filtered SV table.
 That is deliberate, and it is a one-cell edit per gene to change.
 
@@ -144,6 +144,24 @@ The two source lists live in the report tool's repository, so this pair is re-sy
 `assets/gene_lists/` in [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report)
 rather than rebuilt here. Editing the panel in place is still a pipeline change; a rebuild
 from the beds belongs upstream.
+
+#### Corrections applied on top of the upstream lists
+
+Four rows were repaired here rather than taken verbatim, so this pair is **not** a byte-for-byte
+copy of the upstream files. Re-syncing means re-applying these, or fixing them upstream first:
+
+- `EWSR1`, `KDM6B` and `SIK3` carried their **CHM13 coordinates in the hg38 file** — the only
+  three of 128 coordinate rows whose hg38 and t2t cells were identical, off by +463 kb, −96 kb
+  and +15 kb against GENCODE v46. All three are `sv`-scoped, so they are matched on position
+  alone: an hg38 `EWSR1` rearrangement sat well outside the 100 kb SV-span rule and was filtered
+  out of a `lymphoid`-ticked SV table. Replaced with the GENCODE v46 gene spans.
+- `PRKBC` was a transposition of `PRKCB`. With no coordinates on an `snv` row, symbol matching is
+  all it has, so the row matched nothing and `PRKCB` — in the panel before this rebuild — was
+  silently absent.
+- `RCK` is an obsolete alias for `DDX6`, and its coordinates are DDX6's. Renamed, so the
+  `panel_hit` cell names a symbol that VEP output can actually carry.
+- `FAM46C` was dropped: it is the former name of `TENT5C`, which is already in the list, so the
+  row was a dead duplicate. This is what takes the count from 235 rows to 234.
 
 Regenerating the `sarcoma` spans is mechanical — gene spans keyed on `gene_name`, taken from
 `gene` features (GENCODE) or the min/max of `transcript` features (Liftoff, which has no
