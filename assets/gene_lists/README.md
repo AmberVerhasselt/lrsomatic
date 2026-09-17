@@ -1,13 +1,23 @@
 # Gene Panel Lists
 
+These panels belong to the pipeline, not to the report tool. `LRSOMATICREPORT` stages this
+directory into the task and passes it as `--gene-lists-dir`, which replaces the set bundled
+inside `ghcr.io/ljwharbers/lrsomatic-report`. Adding, editing or removing a panel here is a
+pipeline change and needs no release of
+[lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report) — drop a TSV in, and it
+becomes a builtin that `--report_gene_panel` accepts and the report offers as a tickbox.
+
+The files originated in that tool (MIT licensed) and were moved here when the pipeline
+stopped vendoring its source.
+
 Each file is a TSV with a required `gene` column (HGNC symbol). Coordinate columns
 `chrom` (or `chr`), `start` and `end` are optional but **all-or-nothing** — a file with
 some but not all three is rejected rather than quietly falling back to symbol matching.
 
-| Panel columns | Small-variant filter | SV filter |
-|---|---|---|
-| `gene` only | symbol match | direct-hit symbol match on either breakend's VEP gene — no windows |
-| `gene, chrom, start, end` | symbol match | coordinate match: within 1 Mb of a breakend (BND) or 100 kb of the SV span (other types) |
+| Panel columns             | Small-variant filter | SV filter                                                                                |
+| ------------------------- | -------------------- | ---------------------------------------------------------------------------------------- |
+| `gene` only               | symbol match         | direct-hit symbol match on either breakend's VEP gene — no windows                       |
+| `gene, chrom, start, end` | symbol match         | coordinate match: within 1 Mb of a breakend (BND) or 100 kb of the SV span (other types) |
 
 Coordinate matching is what makes breakend filtering reliable: whether a BND carries a
 VEP gene symbol at all depends on the sample's VEP invocation (1.6%–90% of breakends
@@ -41,23 +51,26 @@ reference.
 
 ## Supplying a custom panel
 
+A panel does not have to live here. `--report_gene_panel` takes file paths too, and the
+pipeline stages them into the task alongside these:
+
 ```bash
-Rscript bin/render_report.R \
-  --sample-dir /path/to/sample \
-  --sample-id MySample \
-  --gene-panel /path/to/my_genes.tsv
+nextflow run . --report_gene_panel /path/to/my_genes.tsv
+nextflow run . --report_gene_panel lymphoid,/path/to/my_genes.tsv
 ```
+
+The difference between the two routes: a TSV in this directory is a _builtin_, so its
+`.hg38`/`.t2t` pair collapses to one entry resolved against the rendered reference, and it
+is embedded in every report whether or not it was asked for. A panel given by path is
+registered under its filename and embedded only because it was named.
 
 A one-column file of symbols (with or without a `gene` header) is accepted, and gives
 symbol-only matching. The report's "Custom…" textarea takes bare symbols, so it is
 symbol-only too.
 
-`--gene-panel` is repeatable, so several panels can be applied at once — a builtin and your
-own list together, say. A variant or SV is kept if it hits any of them:
-
-```bash
-  --gene-panel lymphoid --gene-panel /path/to/my_genes.tsv
-```
+Several panels can be applied at once — a builtin and your own list together, say. A variant
+or SV is kept if it hits any of them; `conf/modules.config` turns each comma-separated entry
+into one `--gene-panel` flag.
 
 Each panel is registered under its filename stem; two files sharing a basename both stay
 selectable, the second as `<name>-custom`. Every registered panel is a checkbox in the
@@ -65,12 +78,12 @@ report, so the reader can retick them without re-rendering.
 
 ## Bundled panels
 
-| File | Contents |
-|---|---|
-| `lymphoid.hg38.tsv` | 72 recurrently mutated genes in B-cell lymphomas (DLBCL, FL, MCL, CLL, BL, MALT), GENCODE v46 gene spans |
-| `lymphoid.t2t.tsv` | the same 72 genes, spans from the CHM13v2.0 RefSeq Liftoff v5.1 annotation |
-| `sarcoma.hg38.tsv` | 140 soft-tissue and bone sarcoma genes — tumour suppressors, amplification targets and recurrent fusion partners — GENCODE v46 gene spans |
-| `sarcoma.t2t.tsv` | the same 140 genes, spans from the CHM13v2.0 RefSeq Liftoff v5.1 annotation |
+| File                | Contents                                                                                                                                  |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `lymphoid.hg38.tsv` | 72 recurrently mutated genes in B-cell lymphomas (DLBCL, FL, MCL, CLL, BL, MALT), GENCODE v46 gene spans                                  |
+| `lymphoid.t2t.tsv`  | the same 72 genes, spans from the CHM13v2.0 RefSeq Liftoff v5.1 annotation                                                                |
+| `sarcoma.hg38.tsv`  | 140 soft-tissue and bone sarcoma genes — tumour suppressors, amplification targets and recurrent fusion partners — GENCODE v46 gene spans |
+| `sarcoma.t2t.tsv`   | the same 140 genes, spans from the CHM13v2.0 RefSeq Liftoff v5.1 annotation                                                               |
 
 Regenerating them is mechanical — gene spans keyed on `gene_name`, taken from
 `gene` features (GENCODE) or the min/max of `transcript` features (Liftoff, which has no

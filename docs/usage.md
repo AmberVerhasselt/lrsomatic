@@ -258,10 +258,22 @@ applies to.
 
 #### Report Options
 
-| Parameter             | Description                                                                                                                                                                                                                                                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--report_src`        | Override the report tool source tree (bin/, R/, templates/, assets/). Not needed for normal runs: a copy of [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report) ships inside the pipeline. Point it at a local checkout to render with an unreleased version of the tool. Default = `${projectDir}/assets/lrsomatic_report` |
-| `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered                                                                                               |
+| Parameter             | Description                                                                                                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered |
+
+The report is rendered by [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report)
+running from `ghcr.io/ljwharbers/lrsomatic-report:1.5.0`, or
+`oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.5.0` under Singularity/Apptainer. The tool
+ships inside the image rather than in this repository, so updating it is a container tag bump.
+Images are built for `linux/amd64` only. **Conda is not supported for this step** —
+`LRSOMATICREPORT` stops with an error under `-profile conda`/`mamba`; use `--skip_report`
+there. That lifts once `lrsomatic-report` reaches bioconda.
+
+Builtin gene panels live in `assets/gene_lists/` in this repository, not in the container, and
+are passed to the tool with `--gene-lists-dir`. Adding a panel is therefore a pipeline change:
+drop a TSV in that directory and its name becomes a valid `--report_gene_panel` value. See
+[`assets/gene_lists/README.md`](../assets/gene_lists/README.md) for the file format.
 
 Gene panel filtering is a view, not a filter on the data: every builtin panel is embedded in
 the rendered report and the reader can tick and untick them (or clear them all for the

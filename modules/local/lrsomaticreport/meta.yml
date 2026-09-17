@@ -49,9 +49,9 @@ input:
     - wakhan_files:
         type: file
         description: Collected Wakhan outputs (solutions_ranks.tsv, the ploidy/purity heatmap HTML and the per-solution `solution_<rank>/` directories), or `[]` if Wakhan was skipped
-  - - report_src:
+  - - gene_lists:
         type: directory
-        description: lrsomatic_report source tree (bin/, R/, templates/, assets/), shared across all samples; defaults to the vendored copy at `assets/lrsomatic_report`
+        description: Directory of builtin gene panel TSVs (`<name>.tsv`, or a `<name>.hg38.tsv` / `<name>.t2t.tsv` pair resolved against the rendered reference), passed to the tool as `--gene-lists-dir` and replacing the set bundled in the container. Owned by this pipeline at `assets/gene_lists`, so the panel set can change without a tool release
   - - gene_panels:
         type: file
         description: Optional user-supplied gene panel TSVs (each with a `gene` column) to apply on load, staged into `gene_panels/` so they are bound into the container; `[]` when `--report_gene_panel` names only builtin panels or is unset. Several panels can be active at once and are unioned. Panel files sharing a base name cannot be combined
@@ -74,11 +74,9 @@ output:
       - "lrsomatic_report":
           type: string
           description: The name of the tool
-      - "1.4.0":
+      - "versions":
           type: string
-          description: |
-            Manually pinned version (the tool has no CLI version flag); matches the
-            vendored release recorded in assets/lrsomatic_report/VENDORED.md
+          description: The version of the tool, read from `render_report.R --version`
 
 topics:
   versions:
@@ -88,9 +86,9 @@ topics:
       - lrsomatic_report:
           type: string
           description: The name of the tool
-      - "1.4.0":
+      - "versions":
           type: string
-          description: Manually pinned version (tool has no CLI version flag)
+          description: The version of the tool, read from `render_report.R --version`
 
 authors:
   - "@ljwharbers"

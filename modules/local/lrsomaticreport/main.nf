@@ -2,28 +2,36 @@ process LRSOMATICREPORT {
     tag "$meta.id"
     label 'process_medium'
 
-    conda "${moduleDir}/environment.yml"
-    // Dependencies only (the tool is vendored at assets/lrsomatic_report); when environment.yml changes rebuild both images with `wave --conda-file modules/local/lrsomaticreport/environment.yml --freeze --await [--singularity]`
-    container "${workflow.containerEngine == 'singularity'
-        ? 'oras://community.wave.seqera.io/library/r-base_quarto_r-base64enc_r-data.table_pruned:dc62d809aa6fd497'
-        : 'community.wave.seqera.io/library/r-base_quarto_r-base64enc_r-data.table_pruned:c1049dbaf31bf178'}"
+    // Conda is not supported: the image carries the lrsomatic_report tool itself, not just its
+    // dependencies, so an environment.yml would install the R/Quarto stack without render_report.R
+    // (the guard in `script:` stops conda/mamba runs). Switch to a bioconda `lrsomatic-report`
+    // package once the recipe at github.com/ljwharbers/lrsomatic_report/tree/main/recipe is merged.
+    // Updating the tool is a tag bump here: tag upstream, let its container workflow build, edit these two lines.
+    container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
+        ? 'oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.5.0'
+        : 'ghcr.io/ljwharbers/lrsomatic-report:1.5.0'}"
 
     input:
     // Every path input is optional (`[]` when skipped); tumor/normal QC stage into separate dirs because a matched pair shares meta.id
     tuple val(meta), path(vep_somatic), path(sv_vep), path(severus_vcf), path(somatic_vcf), path(ascat_files), path(qc_tumor_files, stageAs: 'qc_tumor/*'), path(qc_normal_files, stageAs: 'qc_normal/*'), path(wakhan_files, stageAs: 'wakhan/*')
-    path(report_src) // lrsomatic_report source tree (bin/, R/, templates/, assets/)
+    // Builtin gene panel TSVs, owned by this pipeline rather than by the tool, so the panel set
+    // can change without a tool release; reaches the tool as --gene-lists-dir
+    path(gene_lists, stageAs: 'gene_lists')
     // User-supplied gene panel TSVs (`[]` for builtins); the matching `--gene-panel gene_panels/<base>` args are built in conf/modules.config
     path(gene_panels, stageAs: 'gene_panels/*')
 
     output:
     tuple val(meta), path("*_report.html"), emit: report
-    // WARN: Manually update to match the vendored release in assets/lrsomatic_report/VENDORED.md
-    tuple val("${task.process}"), val('lrsomatic_report'), val('1.4.0'), topic: versions, emit: versions_lrsomaticreport
+    tuple val("${task.process}"), val('lrsomatic_report'), eval('render_report.R --version'), topic: versions, emit: versions_lrsomaticreport
 
     when:
     task.ext.when == null || task.ext.when
 
     script:
+    // Exit if running this module with -profile conda / -profile mamba
+    if (workflow.profile.tokenize(',').intersect(['conda', 'mamba']).size() >= 1) {
+        error "LRSOMATICREPORT does not support Conda: the report tool ships only inside its container. Use Docker / Singularity / Apptainer, or --skip_report."
+    }
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     def sex = meta.sex ?: 'male'
@@ -46,12 +54,6 @@ process LRSOMATICREPORT {
     export TMPDIR=\$PWD/tmp TMP=\$PWD/tmp TEMP=\$PWD/tmp
     mkdir -p "\$TMPDIR"
 
-    # The Wave container doesn't source conda's activation hooks (quarto needs QUARTO_SHARE_PATH); -profile conda may already set CONDA_PREFIX
-    export CONDA_PREFIX="\${CONDA_PREFIX:-/opt/conda}"
-    for f in "\$CONDA_PREFIX"/etc/conda/activate.d/*.sh; do
-        [ -f "\$f" ] && source "\$f"
-    done
-
     mkdir -p sample_dir
     ${link_flat}
     ${link_somatic}
@@ -72,11 +74,12 @@ process LRSOMATICREPORT {
         for f in wakhan/*; do ln -s "\$PWD/\$f" "sample_dir/wakhan/\$(basename "\$f")"; done
     fi
 
-    Rscript "${report_src}/bin/render_report.R" \\
+    render_report.R \\
         --sample-dir sample_dir \\
         --sample-id "${prefix}" \\
         --sex "${sex}" \\
         --reference auto \\
+        --gene-lists-dir gene_lists \\
         --output "${prefix}_report.html" \\
         ${args}
     """

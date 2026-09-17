@@ -637,9 +637,9 @@ Mutational signature analysis of the PASS SNVs and indels in the phased somatic 
 │   ├── {sample}_report.html
 ```
 
-| File                   | Description                                                                                                                                                                                                                                                                                         |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `{sample}_report.html` | Self-contained per-sample HTML report ([lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report)): circos plot, small/structural variant tables, copy-number summary, and QC. Any section whose upstream data is unavailable (e.g. a skipped tool) shows a "not available" notice instead. |
+| File                   | Description                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{sample}_report.html` | Self-contained per-sample HTML report ([lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report), run from `ghcr.io/ljwharbers/lrsomatic-report`): circos plot, small/structural variant tables, copy-number summary, and QC. Any section whose upstream data is unavailable (e.g. a skipped tool) shows a "not available" notice instead. |
 
 </details>
 
