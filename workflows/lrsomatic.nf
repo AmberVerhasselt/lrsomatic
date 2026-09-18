@@ -181,11 +181,29 @@ workflow LRSOMATIC {
 
     // Verdict resolves its ASCAT loci/allele/GC set from --cna_resource_dir. The image ships the
     // GRCh38 set, so resources are only needed for another assembly.
-    clairsto_cna_dir = params.clairsto_cna_resources
+    //
+    // Only ClairS-TO's own Verdict estimate reads them. With ASCAT in the run, CLAIRSTO is called
+    // with --disable_verdict and CLAIRSTO_VERDICT_TAG tags from ASCAT's tables instead, so the
+    // resources are neither built nor passed.
+    clairsto_cna_dir = params.skip_ascat && params.clairsto_cna_resources
         ? validateClairstoCnaResources(params.clairsto_cna_resources)
         : null
+    if (params.clairsto_cna_resources && !params.skip_ascat) {
+        log.warn("--clairsto_cna_resources is ignored without --skip_ascat: Verdict's germline tagging comes from ASCAT's purity and copy number, not from ClairS-TO's own estimate of them.")
+    }
     // CHM13 has no ascat_loci_rt attribute, so the built set is GC-only by construction
-    build_clairsto_cna = clairsto_cna_dir == null && params.genome == 'CHM13'
+    build_clairsto_cna = clairsto_cna_dir == null && params.genome == 'CHM13' && params.skip_ascat
+
+    // An absent loci or allele set would leave the join below waiting forever and CLAIRSTO would
+    // silently never run, taking every tumour-only output with it
+    if (build_clairsto_cna) {
+        def missing_ascat = ['ascat_alleles': params.ascat_allele_files,
+                             'ascat_loci': params.ascat_loci_files,
+                             'ascat_loci_gc': params.ascat_gc_file].findAll { _attr, value -> !value }.keySet()
+        if (missing_ascat) {
+            error("ClairS-TO's Verdict module needs the ASCAT loci, allele and GC content files for ${params.genome}, but ${missing_ascat.join(', ')} ${missing_ascat.size() == 1 ? 'is' : 'are'} not set. Add ${missing_ascat.size() == 1 ? 'it' : 'them'} to the genome config, or pass a prepared directory with --clairsto_cna_resources.")
+        }
+    }
 
     // DeepSomatic PON channel: user-supplied VCF paths, or empty list (process falls back to container defaults)
     ds_pon_files = params.deepsomatic_pon_vcfs != null
