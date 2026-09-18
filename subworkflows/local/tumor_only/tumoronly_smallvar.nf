@@ -1,5 +1,6 @@
 // IMPORT MODULES
 include { CLAIRSTO                  } from '../../../modules/local/clairsto/main.nf'
+include { CLAIRSTO_VERDICT_TAG      } from '../../../modules/local/clairsto/verdict_tag/main.nf'
 include { VCFSPLIT                  } from '../../../modules/local/vcfsplit/main.nf'
 
 // IMPORT SUBWORKFLOWS
@@ -21,6 +22,8 @@ workflow TUMORONLY_SMALLVAR {
     //                       Verdict's ASCAT set; [] uses the one inside the ClairS-TO image
     ds_pon_channel       // [ [pon_vcf_path, ...] ] or [ [] ]
     //                       user-supplied DeepSomatic PON VCFs; empty list => container defaults
+    ascat_cna_channel    // [meta, purityploidy, segments] per tumor-only sample from ASCAT, or empty
+    //                       with --skip_ascat; Verdict then tags from its own purity/CNA estimate
 
     main:
 
@@ -60,13 +63,44 @@ workflow TUMORONLY_SMALLVAR {
             clairsto_cna_channel
         )
 
+        if (!params.skip_ascat) {
+            // CLAIRSTO ran with --disable_verdict (conf/modules.config) and its VCFs carry no
+            // Verdict tags. The tagging is redone here from ASCAT's purity and segments: the same
+            // ASCAT model, but R ASCAT's estimate rather than the one Verdict's port makes for
+            // itself. Joined on the sample id because ASCAT carries the stripped meta.
+            CLAIRSTO.out.snv_vcf
+                .join(CLAIRSTO.out.indel_vcf)
+                .map { meta, snv_vcf, indel_vcf -> [meta.id, meta, snv_vcf, indel_vcf] }
+                .join(
+                    ascat_cna_channel.map { meta, purityploidy, segments -> [meta.id, purityploidy, segments] },
+                    failOnMismatch: true, failOnDuplicate: true
+                )
+                .map { _id, meta, snv_vcf, indel_vcf, purityploidy, segments ->
+                    return [meta, snv_vcf, indel_vcf, purityploidy, segments]
+                }
+                .set { verdict_tag_input }
+            // verdict_tag_input: [meta, snv_vcf, indel_vcf, purityploidy, segments]
+
+            //
+            // MODULE: CLAIRSTO_VERDICT_TAG (label: process_low)
+            // Input:  [meta, snv_vcf, indel_vcf, purityploidy, segments]
+            // Output: .snv_vcf / .indel_vcf -- [meta, vcf]  -- the same calls, Verdict-tagged
+            //
+            CLAIRSTO_VERDICT_TAG ( verdict_tag_input )
+
+            CLAIRSTO_VERDICT_TAG.out.indel_vcf
+                .join(CLAIRSTO_VERDICT_TAG.out.snv_vcf)
+                .set { clairsto_combined_vcf }
+        }
+        else {
+            CLAIRSTO.out.indel_vcf
+                .join(CLAIRSTO.out.snv_vcf)
+                .set { clairsto_combined_vcf }
+        }
+        // clairsto_combined_vcf: [meta, indel_vcf, snv_vcf]
+
         // SPLIT CLAIRSTO GERMLINE AND SOMATIC VARIATION
         // ClairS-TO tags somatic/germline status in FILTER; VCFSPLIT splits on it
-
-        CLAIRSTO.out.indel_vcf
-                    .join(CLAIRSTO.out.snv_vcf)
-                    .set{ clairsto_combined_vcf }
-        // clairsto_combined_vcf: [meta, indel_vcf, snv_vcf]
 
         //
         // MODULE: VCFSPLIT (label: process_single)

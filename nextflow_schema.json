@@ -518,7 +518,7 @@
                 },
                 "skip_ascat": {
                     "type": "boolean",
-                    "description": "Skip ASCAT"
+                    "description": "Skip ASCAT. ClairS-TO's Verdict germline tagging of tumour-only calls then uses Verdict's own purity and copy number estimate instead of ASCAT's."
                 },
                 "skip_m6a": {
                     "type": "boolean",

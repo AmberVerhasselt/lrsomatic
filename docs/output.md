@@ -297,22 +297,26 @@ Present in **tumor-only** samples (no matched normal).
 │   ├── indel.vcf.gz.tbi
 │   ├── snv.vcf.gz
 │   ├── snv.vcf.gz.tbi
+│   ├── {sample}_Tumor_Purity_Ploidy.txt
+│   ├── {sample}_Tumor_CNA.txt
 │   ├── somatic.vcf.gz
 │   ├── somatic.vcf.gz.tbi
 ```
 
-| File                  | Description                                                           |
-| --------------------- | --------------------------------------------------------------------- |
-| `germline.vcf.gz`     | SNV and indel calls marked as germline (will not include variants QC) |
-| `germline.vcf.gz.tbi` | Index file for germline small variant calls                           |
-| `indel.vcf.gz`        | Raw indel calls in vcf format                                         |
-| `indel.vcf.gz.tbi`    | Index for somatic indel calls                                         |
-| `snv.vcf.gz`          | Raw SNV calls in vcf format                                           |
-| `snv.vcf.gz.tbi`      | Index for SNV calls                                                   |
-| `somatic.vcf.gz`      | SNV and indel calls marked as PASS and without a germline tag         |
-| `somatic.vcf.gz.tbi`  | Index for somatic small variant calls                                 |
+| File                               | Description                                                                                                                 |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `germline.vcf.gz`                  | SNV and indel calls marked as germline (will not include variants QC)                                                       |
+| `germline.vcf.gz.tbi`              | Index file for germline small variant calls                                                                                 |
+| `indel.vcf.gz`                     | Raw indel calls in vcf format                                                                                               |
+| `indel.vcf.gz.tbi`                 | Index for somatic indel calls                                                                                               |
+| `snv.vcf.gz`                       | Raw SNV calls in vcf format                                                                                                 |
+| `snv.vcf.gz.tbi`                   | Index for SNV calls                                                                                                         |
+| `{sample}_Tumor_Purity_Ploidy.txt` | Purity and ploidy the Verdict tags were computed from (ASCAT's, unless `--skip_ascat`). Absent when ASCAT found no solution |
+| `{sample}_Tumor_CNA.txt`           | Allele-specific copy number segments the Verdict tags were computed from (ASCAT's, unless `--skip_ascat`)                   |
+| `somatic.vcf.gz`                   | SNV and indel calls marked as PASS and without a germline tag                                                               |
+| `somatic.vcf.gz.tbi`               | Index for somatic small variant calls                                                                                       |
 
-The germline/somatic split comes from two assembly-specific sources: a panel of normals of population allele databases, and ClairS-TO's Verdict module, which infers copy number and tumour purity and tags each call as germline, somatic or subclonal somatic. Both are supplied for GRCh38 and CHM13, so the split is assembly-correct on either. Verdict only applies tags when the estimated tumour purity is at most 0.6, and it is disabled — with a warning in the ClairS-TO log — if its reference resources cannot belong to the reference the BAM was aligned to. When it is disabled, germline calls are separated by the panel of normals alone and more of them reach `somatic.vcf.gz`. See [CHM13 support](usage.md#chm13-support) in the usage docs.
+The germline/somatic split comes from two assembly-specific sources: a panel of normals of population allele databases, and ClairS-TO's Verdict module, which tags each call as germline, somatic or subclonal somatic from the sample's tumour purity and allele-specific copy number. Both are supplied for GRCh38 and CHM13, so the split is assembly-correct on either. Unless ASCAT is skipped, the purity and copy number Verdict uses are ASCAT's — the same profile reported under `ascat/` — because Verdict's own estimate of them proved unreliable (see the changelog for #197); with `--skip_ascat`, Verdict estimates them itself. Verdict only applies tags when the tumour purity is at most 0.6, so above that the VCFs carry no Verdict tags and germline calls are separated by the panel of normals alone. Verdict's own estimate is also disabled — with a warning in the ClairS-TO log — if its reference resources cannot belong to the reference the BAM was aligned to. See [CHM13 support](usage.md#chm13-support) in the usage docs.
 
 #### `severus`
 

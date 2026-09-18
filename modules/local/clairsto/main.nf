@@ -5,8 +5,8 @@ process CLAIRSTO {
     // Fork of ClairS-TO 0.5.1 that resolves Verdict's CNA resources from --cna_resource_dir
     // instead of hardcoded GRCh38 names. No conda build; revert once upstream carries it.
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
-        ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-e2987bf'
-        : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-e2987bf'}"
+        ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8'
+        : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8'}"
 
     input:
     tuple val(meta), path(tumor_bam), path(tumor_bai), val(model), path(pon_vcfs), val(pon_flags)

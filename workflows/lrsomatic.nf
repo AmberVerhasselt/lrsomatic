@@ -591,19 +591,6 @@ workflow LRSOMATIC {
     //                                                    each item is a single sample, joined downstream
     // branched_minimap.tumor_only: [meta, bam, bai]  -- tumor-only samples (no matched normal)
 
-    // SUBWORKFLOW: TUMORONLY_SMALLVAR
-    // Input:  branched_minimap.tumor_only -- [meta, bam, bai]
-    // Output: .somatic_vcf  -- [meta, vcf, tbi]  -- somatic SNVs/indels
-    //         .germline_vcf -- [meta, vcf, tbi]  -- germline SNVs/indels (ClairS-TO germline output)
-    TUMORONLY_SMALLVAR(
-        branched_minimap.tumor_only,
-        ch_fasta,
-        ch_fai,
-        clairsto_pon_channel,
-        clairsto_cna_channel,
-        ds_pon_channel
-    )
-
     branched_minimap.paired
         .set{paired_ch}
 
@@ -652,6 +639,88 @@ workflow LRSOMATIC {
         .join(paired_normal_bams)
         .set { somatic_smallvar_input }
     // somatic_smallvar_input: [meta, tumor_bam, tumor_bai, normal_bam, normal_bai]
+
+    //
+    // MODULE: ASCAT (label: process_high)
+    // Runs before small variant calling: the tumor-only germline tagging (CLAIRSTO_VERDICT_TAG)
+    // takes ASCAT's purity and segments, and ASCAT itself needs only the BAMs.
+    // Input:  [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]  -- NOTE: normal before tumor (ASCAT convention)
+    //         normal_bam/bai are [] for tumor-only samples
+    //         allele_files, loci_files, gc_file, rt_file  -- ASCAT reference files
+    // Output: .png plots, .segments, .purity_ploidy  -- copy number results
+    //
+
+    ch_ascat_files = channel.empty()
+    ascat_tumoronly_ch = channel.empty()
+
+    if (!params.skip_ascat) {
+        branched_minimap.tumor_only
+            .map { meta, bam, bai ->
+                def new_meta = meta.subMap('id',
+                            'paired_data',
+                            'platform',
+                            'sex',
+                            'fiber',
+                            'clair3_model',
+                            'clairS_model',
+                            'clairSTO_model',
+                            'kinetics')
+                def normal_bam = []
+                def normal_bai = []
+                return [new_meta, normal_bam, normal_bai, bam, bai]
+            }
+            .mix(
+                somatic_smallvar_input
+                    .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai ->
+                        return [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]
+                    }
+            )
+            .set { ascat_ch }
+        // ascat_ch: [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]
+
+        ASCAT (
+            ascat_ch,
+            params.genome_name,
+            allele_files,
+            loci_files,
+            [],
+            [],
+            gc_file,
+            rt_file
+        )
+
+        ch_versions = ch_versions.mix(ASCAT.out.versions)
+
+        // Purity/ploidy and segments of each tumor-only sample, for Verdict's germline tagging
+        ASCAT.out.purityploidy
+            .join(ASCAT.out.segments)
+            .filter { meta, _purityploidy, _segments -> !meta.paired_data }
+            .set { ascat_tumoronly_ch }
+        // ascat_tumoronly_ch: [meta, purityploidy, segments]
+
+        // Collect all ASCAT copy-number files (segments_raw, purityploidy, diagnostic PNGs) per sample
+        // for the final report module -- it globs by suffix, so exact grouping doesn't matter.
+        ch_ascat_files = ASCAT.out.segments_raw
+            .mix(ASCAT.out.purityploidy, ASCAT.out.png)
+            .groupTuple()
+            .map { meta, files -> [meta, files.flatten()] }
+        // ch_ascat_files: [meta, [file, file, ...]]
+    }
+
+    // SUBWORKFLOW: TUMORONLY_SMALLVAR
+    // Input:  branched_minimap.tumor_only -- [meta, bam, bai]
+    //         ascat_tumoronly_ch          -- [meta, purityploidy, segments], empty with --skip_ascat
+    // Output: .somatic_vcf  -- [meta, vcf, tbi]  -- somatic SNVs/indels
+    //         .germline_vcf -- [meta, vcf, tbi]  -- germline SNVs/indels (ClairS-TO germline output)
+    TUMORONLY_SMALLVAR(
+        branched_minimap.tumor_only,
+        ch_fasta,
+        ch_fai,
+        clairsto_pon_channel,
+        clairsto_cna_channel,
+        ds_pon_channel,
+        ascat_tumoronly_ch
+    )
 
     // SUBWORKFLOW: PAIRED_SMALLVAR_SOMATIC
     // Input:  somatic_smallvar_input -- [meta, tumor_bam, tumor_bai, normal_bam, normal_bai]
@@ -1044,46 +1113,6 @@ workflow LRSOMATIC {
         ch_bam_stats = BAM_STATS_SAMTOOLS.out.stats
         ch_bam_flagstat = BAM_STATS_SAMTOOLS.out.flagstat
         ch_bam_idxstats = BAM_STATS_SAMTOOLS.out.idxstats
-    }
-
-    //
-    // MODULE: ASCAT (label: process_high)
-    // Input:  [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]  -- NOTE: normal before tumor (ASCAT convention)
-    //         allele_files, loci_files, gc_file, rt_file  -- ASCAT reference files
-    // Output: .png plots, .segments, .purity_ploidy  -- copy number results
-    //
-
-    ch_ascat_files = channel.empty()
-
-    if (!params.skip_ascat) {
-        // ASCAT expects [normal, tumor] order; rearrange from severus_input [tumor, normal] order
-        severus_input
-            .map { meta, tumor_bam, tumor_bai, normal_bam, normal_bai, _vcf, _tbi ->
-                return [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]
-            }
-            .set { ascat_ch }
-        // ascat_ch: [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]
-
-        ASCAT (
-            ascat_ch,
-            params.genome_name,
-            allele_files,
-            loci_files,
-            [],
-            [],
-            gc_file,
-            rt_file
-        )
-
-        ch_versions = ch_versions.mix(ASCAT.out.versions)
-
-        // Collect all ASCAT copy-number files (segments_raw, purityploidy, diagnostic PNGs) per sample
-        // for the final report module -- it globs by suffix, so exact grouping doesn't matter.
-        ch_ascat_files = ASCAT.out.segments_raw
-            .mix(ASCAT.out.purityploidy, ASCAT.out.png)
-            .groupTuple()
-            .map { meta, files -> [meta, files.flatten()] }
-        // ch_ascat_files: [meta, [file, file, ...]]
     }
 
     //
