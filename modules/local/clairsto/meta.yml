@@ -120,6 +120,30 @@ output:
         type: file
         description: SNV VCF index file
         pattern: "*.vcf.gz.tbi"
+  purity_ploidy:
+    - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1' ]`
+    - "*_Tumor_Purity_Ploidy.txt":
+        type: file
+        description: |
+          Tumour purity and ploidy Verdict estimated and tagged from, lifted out of ClairS-TO's
+          work directory. Only written when Verdict ran inside ClairS-TO and reached a solution.
+        pattern: "*_Tumor_Purity_Ploidy.txt"
+  cna:
+    - meta:
+        type: map
+        description: |
+          Groovy Map containing sample information
+          e.g. `[ id:'sample1' ]`
+    - "*_Tumor_CNA.txt":
+        type: file
+        description: |
+          Allele-specific copy number segments Verdict tagged from, lifted out of ClairS-TO's
+          work directory. Only written when Verdict ran inside ClairS-TO and reached a solution.
+        pattern: "*_Tumor_CNA.txt"
   versions_clairsto:
     - - ${task.process}:
           type: string

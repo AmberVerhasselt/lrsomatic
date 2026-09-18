@@ -48,6 +48,14 @@ process CLAIRSTO_VERDICT_TAG {
                 --tumor_purity_ploidy_output_file ${prefix}_Tumor_Purity_Ploidy.txt \\
                 --tumor_cna_output_file ${prefix}_Tumor_CNA.txt
         fi
+        # bgzip and tabix run unchecked inside Verdict, so a compression failure would otherwise
+        # look exactly like "did not tag" and ship the untagged calls. Verdict's bgzip removes
+        # its input on success, so a leftover plain VCF is that failure.
+        if [ -e \${kind}.vcf ]; then
+            echo "ERROR: Verdict tagged \${kind} but compressing \${kind}.vcf failed" >&2
+            exit 1
+        fi
+
         # Verdict writes nothing when it does not tag (purity above 0.6, or no ASCAT solution).
         # Pass the calls through unchanged then, as ClairS-TO does in that case.
         if [ ! -e \${kind}.vcf.gz ]; then

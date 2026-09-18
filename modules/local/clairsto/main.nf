@@ -20,6 +20,9 @@ process CLAIRSTO {
     tuple val(meta), path("indel.vcf.gz.tbi"),  emit: indel_tbi
     tuple val(meta), path("snv.vcf.gz"),        emit: snv_vcf
     tuple val(meta), path("snv.vcf.gz.tbi"),    emit: snv_tbi
+    // What Verdict tagged from, when it ran inside ClairS-TO (--skip_ascat); absent otherwise
+    tuple val(meta), path("*_Tumor_Purity_Ploidy.txt"), emit: purity_ploidy, optional: true
+    tuple val(meta), path("*_Tumor_CNA.txt"),           emit: cna,           optional: true
     tuple val("${task.process}"), val('clairsto'), eval("run_clairs_to  --version |& sed '1!d ; s/run_clairs_to //'"), topic: versions, emit: versions_clairsto
 
     when:
@@ -43,18 +46,30 @@ process CLAIRSTO {
         --threads $task.cpus \\
         --output_dir . \\
         --sample_name ${prefix} \\
+        --snv_output_prefix snv_out \\
+        --indel_output_prefix indel_out \\
         --panel_of_normals ${pon_string} \\
         --panel_of_normals_require_allele_matching ${flags_string} \\
         $conda_prefix \\
         $cna_resource_dir \\
         $args
 
-    # 0.5.1 names the VCFs after --sample_name and ignores --snv_output_prefix while it holds its
-    # default. Rename back, globbed because ClairS-TO sanitises the sample name inside the path.
-    mv -- snv_*.vcf.gz snv.vcf.gz
-    mv -- snv_*.vcf.gz.tbi snv.vcf.gz.tbi
-    mv -- indel_*.vcf.gz indel.vcf.gz
-    mv -- indel_*.vcf.gz.tbi indel.vcf.gz.tbi
+    # 0.5.1 renames its outputs after --sample_name, but only while the prefixes still hold their
+    # defaults, so the explicit ones above are passed through untouched and these names are fixed.
+    mv snv_out.vcf.gz snv.vcf.gz
+    mv snv_out.vcf.gz.tbi snv.vcf.gz.tbi
+    mv indel_out.vcf.gz indel.vcf.gz
+    mv indel_out.vcf.gz.tbi indel.vcf.gz.tbi
+
+    # Verdict's own purity/ploidy and copy number, when it ran here rather than in
+    # CLAIRSTO_VERDICT_TAG. They are written inside ClairS-TO's work directory under the tool's
+    # default sample name, so lift them out under the same names that step publishes.
+    for table in Purity_Ploidy CNA; do
+        src=\$(find . -path "*/cna_output/*_Tumor_\${table}.txt" -print -quit)
+        if [ -n "\$src" ]; then
+            cp -- "\$src" "${prefix}_Tumor_\${table}.txt"
+        fi
+    done
     """
 
     stub:
