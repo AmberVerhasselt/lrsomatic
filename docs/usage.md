@@ -276,10 +276,23 @@ applies to.
 
 #### Report Options
 
-| Parameter             | Description                                                                                                                                                                                                                                                                                                                                |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--report_src`        | Override the report tool source tree (bin/, R/, templates/, assets/). Not needed for normal runs: a copy of [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report) ships inside the pipeline. Point it at a local checkout to render with an unreleased version of the tool. Default = `${projectDir}/assets/lrsomatic_report` |
-| `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered                                                                                               |
+| Parameter             | Description                                                                                                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered |
+
+The report is rendered by [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report)
+running from `ghcr.io/ljwharbers/lrsomatic-report`, or
+`ghcr.io/ljwharbers/lrsomatic-report-sif` under Singularity/Apptainer, both pinned to a tag in
+[`modules/local/lrsomaticreport/main.nf`](../modules/local/lrsomaticreport/main.nf). The tool
+ships inside the image rather than in this repository, so updating it is a container tag bump.
+Images are built for `linux/amd64` only. **Conda is not supported for this step** —
+`LRSOMATICREPORT` stops with an error under `-profile conda`/`mamba`; use `--skip_report`
+there. That lifts once `lrsomatic-report` reaches bioconda.
+
+Builtin gene panels live in `assets/gene_lists/` in this repository, not in the container, and
+are passed to the tool with `--gene-lists-dir`. Adding a panel is therefore a pipeline change:
+drop a TSV in that directory and its name becomes a valid `--report_gene_panel` value. See
+[`assets/gene_lists/README.md`](../assets/gene_lists/README.md) for the file format.
 
 Gene panel filtering is a view, not a filter on the data: every builtin panel is embedded in
 the rendered report and the reader can tick and untick them (or clear them all for the
@@ -303,6 +316,26 @@ panel declaring a reference other than the one the sample was called against is 
 error rather than a silently wrong filter. Symbol-only panels need no declaration. The
 builtin panels ship one file per reference and are selected by their bare name
 (`lymphoid`, `sarcoma`), resolved against the detected reference.
+
+A panel may also carry an optional `applies_to` column, which scopes a gene to one of the two
+tables. A blank cell (or `both`) filters both, `snv` the small-variant table only, and `sv` the
+SV table only; values are case-insensitive and anything else is a hard error, so a typo cannot
+quietly change what is filtered. A panel with no `applies_to` column behaves exactly as it did
+before the column existed. Because an `snv` row is matched on its symbol alone, it may leave
+`chrom`/`start`/`end` empty — the all-or-nothing rule above applies to which **columns** the
+file carries, and a blank coordinate on a `sv` or blank-scoped row is still an error. The
+column is read by lrsomatic_report ≥ 1.6.0. See
+[`assets/gene_lists/README.md`](../assets/gene_lists/README.md) for the full format.
+
+> **The builtin `lymphoid` panel changed in the release that added this column.** It was rebuilt
+> from two curated NHL lists and went from 72 genes filtering both tables to 234 rows scoped per
+> table. The rearrangement partners (`IGH`, `IGK`, `IGL`, `TRA/D`, `TRB`, `TRG`, `DUSP22`) are in
+> the SV table for the first time; 106 coding genes — `MYD88` and `NOTCH1` among them — are
+> `snv`-scoped and so no longer match structural variants at all, meaning a whole-gene deletion
+> of `MYD88` does not appear in a `lymphoid`-filtered SV table; and 17 genes of the old panel
+> (`CD19`, `MS4A1`, `SOX11`, `FAT1`, `KLHL6`, `SPEN` among them) are gone. A run repeated across
+> this change with `--report_gene_panel lymphoid` gives materially different filtered tables.
+> `sarcoma` is unchanged.
 
 ```bash
 nextflow run IntGenomicsLab/lrsomatic \

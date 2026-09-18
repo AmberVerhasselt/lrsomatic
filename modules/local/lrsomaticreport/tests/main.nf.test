@@ -26,7 +26,7 @@ nextflow_process {
                     [], // qc_normal_files
                     []  // wakhan_files
                 ]
-                input[1] = file("${projectDir}/assets/lrsomatic_report", checkIfExists: true)
+                input[1] = file("${projectDir}/assets/gene_lists", checkIfExists: true)
                 input[2] = [] // gene_panels
                 """
             }
@@ -59,7 +59,7 @@ nextflow_process {
                     [], // qc_normal_files
                     []  // wakhan_files
                 ]
-                input[1] = file("${projectDir}/assets/lrsomatic_report", checkIfExists: true)
+                input[1] = file("${projectDir}/assets/gene_lists", checkIfExists: true)
                 input[2] = [] // gene_panels
                 """
             }
@@ -99,7 +99,7 @@ nextflow_process {
                     [], // qc_normal_files
                     []  // wakhan_files
                 ]
-                input[1] = file("${projectDir}/assets/lrsomatic_report", checkIfExists: true)
+                input[1] = file("${projectDir}/assets/gene_lists", checkIfExists: true)
                 input[2] = [ file("${projectDir}/modules/local/lrsomaticreport/tests/test_panel.tsv", checkIfExists: true) ]
                 """
             }
@@ -137,7 +137,7 @@ nextflow_process {
                     [], // qc_normal_files
                     []  // wakhan_files
                 ]
-                input[1] = file("${projectDir}/assets/lrsomatic_report", checkIfExists: true)
+                input[1] = file("${projectDir}/assets/gene_lists", checkIfExists: true)
                 input[2] = [
                     file("${projectDir}/modules/local/lrsomaticreport/tests/test_panel.tsv", checkIfExists: true),
                     file("${projectDir}/modules/local/lrsomaticreport/tests/test_panel_b.tsv", checkIfExists: true)

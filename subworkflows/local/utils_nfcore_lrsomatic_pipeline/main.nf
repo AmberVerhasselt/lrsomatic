@@ -259,10 +259,10 @@ def reportGenePanelIsFile(tok) {
 }
 
 //
-// Builtin panel names bundled with the report tool, reference suffix dropped
+// Builtin panel names shipped in assets/gene_lists, reference suffix dropped
 //
 def reportBuiltinGenePanels() {
-    def gene_lists_dir = file("${params.report_src}/assets/gene_lists")
+    def gene_lists_dir = file("${projectDir}/assets/gene_lists")
     if (!gene_lists_dir.exists()) {
         return []
     }
