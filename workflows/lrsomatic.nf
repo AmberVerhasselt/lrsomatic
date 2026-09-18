@@ -1185,7 +1185,7 @@ workflow LRSOMATIC {
 
         LRSOMATICREPORT (
             report_input_ch,
-            file(params.report_src, checkIfExists: true),
+            file("${projectDir}/assets/gene_lists", checkIfExists: true),
             report_gene_panel_files
         )
     }
