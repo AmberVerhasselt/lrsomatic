@@ -1,10 +1,16 @@
 name: Post PR comment
-# Shared, privileged comment poster. Producer workflows run untrusted PR code with a
-# read-only token and upload a plain-text `pr-comment` artifact; this workflow only
-# reads that artifact, so no PR code runs with the write token.
+# Shared, privileged comment poster.
 #
-# Artifact contract: pr_number.txt, header.txt (sticky-comment id),
-# comment.md (omit to post nothing).
+# This is the single workflow that runs with a write token. It is triggered
+# after any of the listed "producer" workflows complete on a pull request.
+# Each producer runs untrusted PR code (if any) with a read-only token and
+# uploads a `pr-comment` artifact describing the comment to post; this workflow
+# only ever reads that plain-text artifact, so no PR code is executed here.
+#
+# Artifact contract (uploaded by producers under the name `pr-comment`):
+#   pr_number.txt  - the pull request number
+#   header.txt     - sticky-comment identifier (keeps comment types separate)
+#   comment.md     - the Markdown body (omit the file to post nothing)
 
 on:
   workflow_run:
