@@ -29,6 +29,9 @@ The pipeline produces per-sample output directories. Two modes exist depending o
 │    │    │   ├── nanoplot_ubam_rep1
 │    │    │   └── samtools
 │    │    └── whatshap_stats
+│    ├── signatures
+│    │   ├── assignment
+│    │   └── matrices
 │    ├── variants
 │    │   ├── clairsto
 │    │   ├── deepsomatic
@@ -38,7 +41,8 @@ The pipeline produces per-sample output directories. Two modes exist depending o
 │    ├── vep
 │    │   ├── somatic
 │    │   └── SVs
-│    └── wakhan
+│    ├── wakhan
+│    └── report
 ```
 
 **Paired tumor + normal sample**:
@@ -70,6 +74,9 @@ The pipeline produces per-sample output directories. Two modes exist depending o
 │    │    │   ├── nanoplot_ubam_rep1
 │    │    │   └── samtools
 │    │    └── whatshap_stats
+│    ├── signatures
+│    │   ├── assignment
+│    │   └── matrices
 │    ├── variants
 │    │   ├── clair3
 │    │   ├── clairs
@@ -81,7 +88,8 @@ The pipeline produces per-sample output directories. Two modes exist depending o
 │    │   ├── germline
 │    │   ├── somatic
 │    │   └── SVs
-│    └── wakhan
+│    ├── wakhan
+│    └── report
 ├── pipeline_info
 └── multiqc
 ```
@@ -176,18 +184,18 @@ QC outputs are placed under `tumor/` for all samples, and additionally under `no
 │   │   ├── fibertoolsrs
 │   │   │   ├── sample_qc.txt
 │   │   ├── mosdepth
-│   │   │   ├── sample.mosdepth.global.dist.txt
-│   │   │   ├── sample.mosdepth.summary.txt
+│   │   │   ├── sample_tumor.mosdepth.global.dist.txt
+│   │   │   ├── sample_tumor.mosdepth.summary.txt
 │   │   ├── nanoplot_aln
 │   │   │   ├── sample_tumor_aln_NanoStats.txt
 │   │   │   ├── sample_tumor_aln_NanoPlot-report.html
 │   │   ├── nanoplot_ubam_rep1
-│   │   │   ├── sample_tumor_ubam_NanoStats.txt
-│   │   │   ├── sample_tumor_ubam_NanoPlot-report.html
+│   │   │   ├── sample_tumor_rep1_ubam_NanoStats.txt
+│   │   │   ├── sample_tumor_rep1_ubam_NanoPlot-report.html
 │   │   ├── samtools
-│   │   │   ├── sample.flagstat
-│   │   │   ├── sample.idxstats
-│   │   │   ├── sample.stats
+│   │   │   ├── sample_tumor.flagstat
+│   │   │   ├── sample_tumor.idxstats
+│   │   │   ├── sample_tumor.stats
 │   ├── normal                          # paired samples only
 │   │   └── [same subdirectories as tumor]
 │   ├── whatshap_stats
@@ -195,22 +203,22 @@ QC outputs are placed under `tumor/` for all samples, and additionally under `no
 │   │   ├── sample.blocklist.tsv
 ```
 
-| File                                                         | Description                                                                                                              |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `cramino_aln/sample_{type}_cramino.txt`                      | cramino QC summary statistics for the aligned bam file                                                                   |
-| `cramino_ubam_rep1/sample_{type}_cramino.txt`                | cramino QC summary statistics for the unaligned bam files                                                                |
-| `fibertoolsrs/sample_qc.txt`                                 | fibertools QC summary for the bam file                                                                                   |
-| `mosdepth/sample.mosdepth.global.dist.txt`                   | a cumulative distribution indicating the proportion of total bases that were covered for at least a given coverage value |
-| `mosdepth/sample.mosdepth.summary.txt`                       | overall summary file from mosdepth tool                                                                                  |
-| `nanoplot_aln/sample_{type}_aln_NanoStats.txt`               | NanoPlot summary statistics for the aligned BAM file                                                                     |
-| `nanoplot_aln/sample_{type}_aln_NanoPlot-report.html`        | NanoPlot interactive HTML report for the aligned BAM file                                                                |
-| `nanoplot_ubam_rep1/sample_{type}_ubam_NanoStats.txt`        | NanoPlot summary statistics for the unaligned BAM file                                                                   |
-| `nanoplot_ubam_rep1/sample_{type}_ubam_NanoPlot-report.html` | NanoPlot interactive HTML report for the unaligned BAM file                                                              |
-| `samtools/sample.flagstat`                                   | a summary of the counts of different samtools flags                                                                      |
-| `samtools/sample.idxstats`                                   | a summary of the number of mapped and unmapped reads                                                                     |
-| `samtools/sample.stats`                                      | summary statistics from the bamfile                                                                                      |
-| `whatshap_stats/sample.stats.tsv`                            | WhatsHap phasing statistics per chromosome including phase block N50 and switch error rates                              |
-| `whatshap_stats/sample.blocklist.tsv`                        | list of all phase blocks with their genomic coordinates                                                                  |
+| File                                                              | Description                                                                                                              |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `cramino_aln/sample_{type}_cramino.txt`                           | cramino QC summary statistics for the aligned bam file                                                                   |
+| `cramino_ubam_rep1/sample_{type}_cramino.txt`                     | cramino QC summary statistics for the unaligned bam files                                                                |
+| `fibertoolsrs/sample_qc.txt`                                      | fibertools QC summary for the bam file                                                                                   |
+| `mosdepth/sample_{type}.mosdepth.global.dist.txt`                 | a cumulative distribution indicating the proportion of total bases that were covered for at least a given coverage value |
+| `mosdepth/sample_{type}.mosdepth.summary.txt`                     | overall summary file from mosdepth tool                                                                                  |
+| `nanoplot_aln/sample_{type}_aln_NanoStats.txt`                    | NanoPlot summary statistics for the aligned BAM file                                                                     |
+| `nanoplot_aln/sample_{type}_aln_NanoPlot-report.html`             | NanoPlot interactive HTML report for the aligned BAM file                                                                |
+| `nanoplot_ubam_rep1/sample_{type}_rep1_ubam_NanoStats.txt`        | NanoPlot summary statistics for the unaligned BAM file                                                                   |
+| `nanoplot_ubam_rep1/sample_{type}_rep1_ubam_NanoPlot-report.html` | NanoPlot interactive HTML report for the unaligned BAM file                                                              |
+| `samtools/sample_{type}.flagstat`                                 | a summary of the counts of different samtools flags                                                                      |
+| `samtools/sample_{type}.idxstats`                                 | a summary of the number of mapped and unmapped reads                                                                     |
+| `samtools/sample_{type}.stats`                                    | summary statistics from the bamfile                                                                                      |
+| `whatshap_stats/sample.stats.tsv`                                 | WhatsHap phasing statistics per chromosome including phase block N50 and switch error rates                              |
+| `whatshap_stats/sample.blocklist.tsv`                             | list of all phase blocks with their genomic coordinates                                                                  |
 
 </details>
 
@@ -223,15 +231,20 @@ QC outputs are placed under `tumor/` for all samples, and additionally under `no
 ├── methylation
 │   ├── tumor
 │   │   └── modkit_pileup
-│   │       └── sample.bed.gz
+│   │       ├── sample.bed.gz           # default
+│   │       ├── sample_hp1.bed.gz       # --modkit_phased only
+│   │       ├── sample_hp2.bed.gz       # --modkit_phased only
+│   │       └── sample_combined.bed.gz  # --modkit_phased only
 │   ├── normal                          # paired samples only
 │   │   └── modkit_pileup
-│   │       └── sample.bed.gz
+│   │       └── ...                     # same layout as tumor
 ```
 
-| File                                         | Description                                                                         |
-| -------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `{tumor,normal}/modkit_pileup/sample.bed.gz` | Modkit pileup BED file containing per-CpG methylation frequency and coverage values |
+| File                                                   | Description                                                                                                                                                                                                     |
+| ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{tumor,normal}/modkit_pileup/sample.bed.gz`           | Modkit pileup bedMethyl table (bgzip) with per-strand methylation frequency and coverage. By default (`--modkit_args '--cpg --modified-bases 5mC'`) rows are 5mC calls at CpG sites only.                       |
+| `{tumor,normal}/modkit_pileup/sample_{hp1,hp2}.bed.gz` | With `--modkit_phased`: bedMethyl tables restricted to reads carrying haplotype tag `HP:1` or `HP:2` from the Longphase-haplotagged BAM.                                                                        |
+| `{tumor,normal}/modkit_pileup/sample_combined.bed.gz`  | With `--modkit_phased`: bedMethyl table over all reads, including untagged ones (equivalent to the unphased default output). There is no separate file for untagged reads; they only contribute to `_combined`. |
 
 </details>
 
@@ -284,20 +297,26 @@ Present in **tumor-only** samples (no matched normal).
 │   ├── indel.vcf.gz.tbi
 │   ├── snv.vcf.gz
 │   ├── snv.vcf.gz.tbi
+│   ├── {sample}_Tumor_Purity_Ploidy.txt
+│   ├── {sample}_Tumor_CNA.txt
 │   ├── somatic.vcf.gz
 │   ├── somatic.vcf.gz.tbi
 ```
 
-| File                  | Description                                                           |
-| --------------------- | --------------------------------------------------------------------- |
-| `germline.vcf.gz`     | SNV and indel calls marked as germline (will not include variants QC) |
-| `germline.vcf.gz.tbi` | Index file for germline small variant calls                           |
-| `indel.vcf.gz`        | Raw indel calls in vcf format                                         |
-| `indel.vcf.gz.tbi`    | Index for somatic indel calls                                         |
-| `snv.vcf.gz`          | Raw SNV calls in vcf format                                           |
-| `snv.vcf.gz.tbi`      | Index for SNV calls                                                   |
-| `somatic.vcf.gz`      | SNV and indel calls marked as PASS and without a germline tag         |
-| `somatic.vcf.gz.tbi`  | Index for somatic small variant calls                                 |
+| File                               | Description                                                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `germline.vcf.gz`                  | SNV and indel calls marked as germline (will not include variants QC)                                                                   |
+| `germline.vcf.gz.tbi`              | Index file for germline small variant calls                                                                                             |
+| `indel.vcf.gz`                     | Raw indel calls in vcf format                                                                                                           |
+| `indel.vcf.gz.tbi`                 | Index for somatic indel calls                                                                                                           |
+| `snv.vcf.gz`                       | Raw SNV calls in vcf format                                                                                                             |
+| `snv.vcf.gz.tbi`                   | Index for SNV calls                                                                                                                     |
+| `{sample}_Tumor_Purity_Ploidy.txt` | Purity and ploidy the Verdict tags were computed from: ASCAT's, or Verdict's own with `--skip_ascat`. Absent when no solution was found |
+| `{sample}_Tumor_CNA.txt`           | Allele-specific copy number segments the Verdict tags were computed from: ASCAT's, or Verdict's own with `--skip_ascat`                 |
+| `somatic.vcf.gz`                   | SNV and indel calls marked as PASS and without a germline tag                                                                           |
+| `somatic.vcf.gz.tbi`               | Index for somatic small variant calls                                                                                                   |
+
+The germline/somatic split comes from a panel of normals and from ClairS-TO's Verdict module, which tags each call as germline, somatic or subclonal somatic from tumour purity and allele-specific copy number. Unless `--skip_ascat` is set these come from the pipeline's ASCAT run (the profile under `ascat/`); otherwise Verdict estimates them itself, and its purity can differ from ASCAT's enough to cross the 0.6 threshold above which no Verdict tags are applied. Verdict is also disabled, with a warning in the ClairS-TO log, if its resources cannot belong to the reference. See [CHM13 support](usage.md#chm13-support).
 
 #### `severus`
 
@@ -478,6 +497,103 @@ Phased variant calls produced by Longphase. Present in all samples.
 
 </details>
 
+#### Plugin fields in the `CSQ` annotation
+
+The germline and somatic VCFs carry these extra subfields inside VEP's `CSQ` INFO annotation, on
+top of what `--everything` already produces; the SV VCF is annotated without plugins. Read them
+out with `bcftools +split-vep`.
+
+| Field                                                   | Source                 | Appears on                                              |
+| ------------------------------------------------------- | ---------------------- | ------------------------------------------------------- |
+| `am_pathogenicity`, `am_class`                          | `AlphaMissense` plugin | GRCh38                                                  |
+| `AlphaMissenseProtein_match`                            | `AlphaMissenseProtein` | CHM13                                                   |
+| `am_pathogenicity`, `am_class`                          | `AlphaMissenseProtein` | CHM13, when the lookup resolves                         |
+| `SIFT_score`, `SIFT_pred`                               | `PolyPhen_SIFT` plugin | CHM13 (GRCh38 gets `SIFT` from cache)                   |
+| `PolyPhen_humvar_score`, `PolyPhen_humvar_pred`         | `PolyPhen_SIFT` plugin | CHM13, as above                                         |
+| `ClinVar_CLNSIG`, `ClinVar_CLNREVSTAT`, `ClinVar_CLNDN` | ClinVar `--custom`     | both, fields set by `--vep_clinvar_fields`              |
+| `REVEL`                                                 | `REVEL` plugin         | GRCh38                                                  |
+| `CADD_PHRED`, `CADD_RAW`                                | `CADD` plugin          | GRCh38, only with `--vep_cadd_snv` / `--vep_cadd_indel` |
+| `EVE_SCORE`, `EVE_CLASS`                                | `EVE` plugin           | GRCh38, only with `--vep_eve`                           |
+
+`AlphaMissenseProtein_match` records how the CHM13 protein-space lookup resolved, and is the field
+to check before trusting — or explaining — a missing score:
+
+| Value         | Meaning                                                                                                                                                                     |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `gene_aa`     | Matched on gene symbol and both amino acids; `am_pathogenicity` is populated                                                                                                |
+| `aa_mismatch` | The gene and position exist in the table, but the amino acids disagree — the CHM13 protein and the one AlphaMissense was numbered against differ here, so no score is given |
+| `not_found`   | No row for this gene and position                                                                                                                                           |
+| `no_gene`     | VEP produced no gene symbol for the transcript, so no lookup was possible                                                                                                   |
+
+Only missense substitutions are looked up at all; anything else carries no `AlphaMissenseProtein_*`
+field rather than a match value.
+
+### `signatures`
+
+Mutational signature analysis of the PASS SNVs and indels in the phased somatic VCF: [SigProfilerMatrixGenerator](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator) builds the mutational matrices and [SigProfilerAssignment](https://github.com/SigProfilerSuite/SigProfilerAssignment) fits COSMIC reference signatures to them. The `DBS78` and `ID83` directories are absent when a sample has no doublet substitutions or indels. See [Mutational Signature Options](usage.md#mutational-signature-options) for the CHM13 handling.
+
+<details markdown="1">
+<summary>Output files</summary>
+
+```
+├── signatures
+│   ├── matrices
+│   │   ├── output
+│   │   │   ├── SBS
+│   │   │   │   ├── sample.SBS96.all
+│   │   │   │   ├── sample.SBS288.all
+│   │   │   │   ├── sample.SBS1536.all
+│   │   │   │   └── ...
+│   │   │   ├── DBS
+│   │   │   │   ├── sample.DBS78.all
+│   │   │   │   └── ...
+│   │   │   ├── ID
+│   │   │   │   ├── sample.ID83.all
+│   │   │   │   └── ...
+│   │   │   ├── plots
+│   │   │   │   └── *.pdf
+│   │   │   ├── vcf_files
+│   │   │   └── logs
+│   │   │       ├── SigProfilerMatrixGenerator_sample_<genome>.out
+│   │   │       └── SigProfilerMatrixGenerator_sample_<genome>.err
+│   └── assignment
+│       └── COSMIC_v3.6
+│           ├── SBS96
+│           │   ├── Assignment_Solution
+│           │   │   ├── Activities
+│           │   │   │   ├── Assignment_Solution_Activities.txt
+│           │   │   │   ├── Assignment_Solution_Activity_Plots.pdf
+│           │   │   │   ├── Assignment_Solution_TMB_plot.pdf
+│           │   │   │   └── Decomposed_MutationType_Probabilities.txt
+│           │   │   ├── Signatures
+│           │   │   │   ├── Assignment_Solution_Signatures.txt
+│           │   │   │   └── SBS_96_plots_Assignment_Solution.pdf
+│           │   │   └── Solution_Stats
+│           │   │       ├── Assignment_Solution_Samples_Stats.txt
+│           │   │       └── Assignment_Solution_Signature_Assignment_log.txt
+│           │   └── JOB_METADATA_SPA.txt
+│           ├── DBS78
+│           │   └── ...
+│           └── ID83
+│               └── ...
+```
+
+| File                                                                                     | Description                                                                                                                                        |
+| ---------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `matrices/output/SBS/sample.SBS96.all`                                                   | SBS96 mutational matrix (mutation counts per trinucleotide class); further context sizes (SBS6, SBS24, SBS288, SBS384, SBS1536, SBS6144) alongside |
+| `matrices/output/DBS/sample.DBS78.all`                                                   | DBS78 doublet-substitution matrix (and DBS186/DBS1248/DBS2976 variants)                                                                            |
+| `matrices/output/ID/sample.ID83.all`                                                     | ID83 indel matrix (and ID28/ID96/ID415 variants)                                                                                                   |
+| `matrices/output/plots/*.pdf`                                                            | SigProfilerPlotting spectra of the matrices (with the default `--sigprofiler_matrix_args "--plot"`)                                                |
+| `matrices/output/vcf_files/`                                                             | Sorted input mutations with their SigProfilerMatrixGenerator classification (`seqInfo`)                                                            |
+| `matrices/output/logs/*`                                                                 | SigProfilerMatrixGenerator log and error files; the summary reports the number of analysed mutations and reference-base mismatches                 |
+| `assignment/COSMIC_v<version>/<context>/Assignment_Solution/Activities/*_Activities.txt` | Number of mutations attributed to every COSMIC signature                                                                                           |
+| `assignment/COSMIC_v<version>/<context>/Assignment_Solution/Activities/*.pdf`            | Activity bar plots and tumour mutational burden plot                                                                                               |
+| `assignment/COSMIC_v<version>/<context>/Assignment_Solution/Signatures/`                 | The reference signatures used for the fit and their spectra                                                                                        |
+| `assignment/COSMIC_v<version>/<context>/Assignment_Solution/Solution_Stats/`             | Per-sample reconstruction statistics (cosine similarity, L2 error) and the step-wise assignment log                                                |
+| `assignment/COSMIC_v<version>/<context>/JOB_METADATA_SPA.txt`                            | SigProfilerAssignment run metadata, including the genome build the reference signatures were normalised to                                         |
+
+</details>
+
 ### `wakhan`
 
 <details markdown="1">
@@ -561,7 +677,42 @@ Phased variant calls produced by Longphase. Present in all samples.
 
 </details>
 
+### `report`
+
+<details markdown="1">
+<summary>Output files</summary>
+
+```
+├── report
+│   ├── {sample}_report.html
+```
+
+| File                   | Description                                                                                                                                                                                                                                                                                                                                         |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `{sample}_report.html` | Self-contained per-sample HTML report ([lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report), run from `ghcr.io/ljwharbers/lrsomatic-report`): circos plot, small/structural variant tables, copy-number summary, and QC. Any section whose upstream data is unavailable (e.g. a skipped tool) shows a "not available" notice instead. |
+
+</details>
+
+This is the final step of the pipeline, run after SNV/SV calling, ASCAT, WAKHAN and QC. Disable it with `--skip_report`.
+
+Sections:
+
+- **Small variants** — the VEP-annotated somatic SNVs/indels, with VAF, depth and phase set from the phased somatic VCF; a footnote names the file those columns came from and, after a consensus run, notes that a multi-caller variant's VAF comes from whichever caller won the merge. Unfiltered by default; see `--report_gene_panel` in [usage](usage.md#report-options).
+  - Pathogenicity predictors (SIFT, PolyPhen, AlphaMissense, ClinVar, CADD, REVEL, EVE) are read from the [plugin fields in `CSQ`](#plugin-fields-in-the-csq-annotation), each as a class column with a tickbox filter and a numeric score column. A column appears only when the annotated VCF declared that field, and an **Annotation sources** footnote lists which sources were present.
+- **Structural variants** — SEVERUS breakpoints, annotated from the VEP SV VCF (`{sample}_SV_VEP.vcf.gz`), one row per rearrangement. Breakends additionally get their own circos plot, cross-linked to the SV table and redrawn as the table is filtered. Skipping VEP leaves the SV table unannotated but still drawn on the circos plot.
+- **Copy number** — ASCAT purity/ploidy plus its diagnostic plots, and, when WAKHAN ran, its ranked purity/ploidy solutions with the interactive per-solution genome copy-number/breakpoint plots and the ploidy/purity heatmap.
+- **QC** — mosdepth, cramino and samtools statistics; for a matched tumour/normal pair both sides are shown side by side. Phasing statistics (WhatsHap) are a collapsible block within this section.
+
+Filtering in the browser:
+
+- **Gene panels** are checkboxes in the panel bar; ticked panels are unioned, and `--report_gene_panel` only sets which are ticked on load — see [usage](usage.md#applying-several-panels-at-once). With two or more ticked, each `panel_hit` entry names the panel it matched in square brackets.
+- **Categorical columns** filter by tickbox dropdown rather than a text box: `consequence`, `impact` and `callers` on the small-variant table, and `svclass`, `svtype`, `impact`, `consequence` and `caller` on the SV table. Each dropdown lists the values actually present in that sample with a row count. Ticking several values in one column is OR; ticking values in two columns is AND. A column with fewer than two distinct values keeps a plain text box. Every other column keeps its text box, and the table's own search box still does substring across all columns.
+
+The report is one self-contained file — plots and tables are embedded, so it can be copied or emailed on its own.
+
 ### `multiqc`
+
+Sample rows are named per BAM: `{sample}_tumor` and `{sample}_normal` carry the samtools, mosdepth and post-alignment NanoPlot statistics of that BAM, `{sample}_{type}_rep{N}_ubam` rows carry the pre-alignment NanoPlot statistics of each unaligned replicate, and WhatsHap phasing statistics sit on a plain `{sample}` row because phasing is done once per sample.
 
 <details markdown="1">
 <summary>Output files</summary>
@@ -581,8 +732,10 @@ Phased variant calls produced by Longphase. Present in all samples.
 │   │   ├── multiqc_data.json
 │   │   ├── multiqc_general_stats.txt
 │   │   ├── multiqc_software_versions.txt
+│   │   ├── multiqc_nanostat.txt
 │   │   ├── multiqc_sources.txt
 │   │   ├── multiqc.log
+│   │   ├── nanostat_fasta_stats_table.txt
 │   ├── multiqc_plots
 │   │   ├── pdf
 │   │   │   ├── mosdepth-coverage-per-contig-multi-cnt.pdf

@@ -125,7 +125,31 @@ nextflow run IntGenomicsLab/lrsomatic \
 
 If you want to run with a CHM13 reference without using `--genome CHM13` (for example, via a custom FASTA or configuration), you must also specify `--vep_genome T2T-CHM13v2.0` and `--vep_species homo_sapiens_gca009914755v4`.
 
+This cache carries gene and transcript models only, so every pathogenicity score on CHM13 has to come from a plugin. With `--genome CHM13` the pipeline fetches those itself; note that only the two predictors keyed on protein rather than genome coordinates can reach the assembly at all. See [VEP plugins](#vep-plugins) for which those are and why.
+
+Setting `--vep_genome T2T-CHM13v2.0` by hand, without `--genome CHM13`, resolves no plugin defaults — supply the `--vep_*` paths yourself, or accept VEP without plugin annotation.
+
+For mutational signatures, `--genome CHM13` selects the `CHM13-T2T` SigProfilerMatrixGenerator genome. Its payload is not on the AlexandrovLab FTP yet, so `--download_sigprofiler_genome` fetches it from the IntGenomicsLab Globus collection (`--sigprofiler_genome_url`); see [Mutational Signature Options](#mutational-signature-options).
+
 For structural variants, the CHM13 panel of normals is a merged panel combining the 1000 Genomes CHM13 panel shipped with SEVERUS and the ASAP cohort, with median confidence intervals per breakpoint. The pipeline exposes it as `--pon_file` and hands it to SEVERUS via that tool's own `--PON` flag; it is downloaded automatically with `--genome CHM13`. GRCh38 continues to use the 1000 Genomes panel shipped with SEVERUS.
+
+For tumour-only small variants, ClairS-TO separates germline from somatic calls with a panel of normals and with its Verdict module, which tags each call as germline, somatic or subclonal somatic from tumour purity and allele-specific copy number. `--genome CHM13` supplies five CHM13 PON VCFs (gnomAD, dbSNP, 1000 Genomes, CoLoRSdb and ASAP), which **replace** the GRCh38 databases inside the container. Unless `--skip_ascat` is set, purity and copy number come from the pipeline's own ASCAT run (`CLAIRSTO_VERDICT_TAG`); only with `--skip_ascat` does ClairS-TO estimate them itself, from assembly-specific loci, allele and GC content files. A GRCh38 resource set on a CHM13 run leaves germline variants untagged.
+
+With `--genome CHM13 --skip_ascat` the pipeline builds a CHM13 resource set from the ASCAT files it already downloads, so no extra setup is needed. LogR correction is GC-only, as ClairS-TO recommends for CHM13: no replication timing file is published for the assembly. Without `--skip_ascat` nothing is built, because the tagging comes from ASCAT's own tables.
+
+To use a resource set of your own — another assembly, or a CHM13 set carrying an `RT_<name>.txt` for replication timing correction — pass `--clairsto_cna_resources` together with `--skip_ascat`. Without `--skip_ascat` it is ignored, with a warning. Expected layout:
+
+```
+<dir>/
+  loci_files/<prefix>chr1.txt ... <prefix>chr22.txt, <prefix>chrX.txt
+  allele_files/<prefix>chr1.txt ... <prefix>chr22.txt, <prefix>chrX.txt
+  GC_<name>.txt
+  RT_<name>.txt        (optional; without it, correction is GC-only)
+```
+
+Keep one resource set per directory: ClairS-TO derives the per-contig prefix from the single `*chr1.txt` and takes exactly one `GC_*.txt`. The directory must be self-contained, since only the directory itself is staged into the container; materialise symlinked content with `cp -rL`. Both are checked at startup.
+
+If the loci cannot belong to the reference, ClairS-TO disables Verdict with a warning rather than applying the wrong coordinates. On a `--skip_ascat` run, look for `VERDICT CNA RESOURCE DIRECTORY` in the ClairS-TO log to confirm which set was used; otherwise Verdict runs outside ClairS-TO and the tables the tags came from are published next to the VCFs.
 
 ### Pipeline options
 
@@ -137,23 +161,34 @@ For structural variants, the CHM13 panel of normals is a merged panel combining 
 
 #### Skipping options:
 
-| Parameter              | Description                                                                                                                                                                          |
-| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `--skip_qc`            | A boolean to skip all QC steps, including `mosdepth`, `samtools`,`fibertools`, `cramino`. Default = `false`                                                                          |
-| `--skip_fiber`         | A boolean to skip all `fibertools` related modules. Default = `false`                                                                                                                |
-| `--skip_cramino`       | A boolean to skip `cramino`. Default = `false`                                                                                                                                       |
-| `--skip_mosdepth`      | A boolean to skip `mosdepth`. Default = `false`                                                                                                                                      |
-| `--skip_ascat`         | A boolean to skip `ascat`. Default = `false`                                                                                                                                         |
-| `--skip_savana`        | A boolean to skip `savana` (SV + copy-number calling). Default = `false`                                                                                                             |
-| `--skip_bamstats`      | A boolean to skip `bamstats`. Default = `false`                                                                                                                                      |
-| `--skip_wakhan`        | A boolean to skip `wakhan`. Default = `false`                                                                                                                                        |
-| `--skip_vep`           | A boolean to skip `vep`. Default = `false`                                                                                                                                           |
-| `--skip_m6a`           | A boolean to skip `fibertools_m6a`, used if you have m6a calls but would still like nucleosome positions for PacBio data (ONT data is required to have m6a calls). Default = `false` |
-| `--skip_nanoplot`      | A boolean to skip NanoPlot QC on aligned and unaligned BAM files. Default = `false`                                                                                                  |
-| `--skip_normalfiber`   | A boolean to skip fibertools processing for the normal sample. Default = `false`                                                                                                     |
-| `--skip_modcall`       | A boolean to skip modkit methylation calling. Default = `false`                                                                                                                      |
-| `--skip_modkit`        | A boolean to skip the modkit pileup step. Default = `false`                                                                                                                          |
-| `--skip_whatshapstats` | A boolean to skip WhatsHap phasing statistics. Default = `false`                                                                                                                     |
+| Parameter              | Description                                                                                                                                                                                                                                                             |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--skip_qc`            | A boolean to skip all QC steps, including `mosdepth`, `samtools`,`fibertools`, `cramino`. Default = `false`                                                                                                                                                             |
+| `--skip_fiber`         | A boolean to skip all `fibertools` related modules. Default = `false`                                                                                                                                                                                                   |
+| `--skip_cramino`       | A boolean to skip `cramino`. Default = `false`                                                                                                                                                                                                                          |
+| `--skip_mosdepth`      | A boolean to skip `mosdepth`. Default = `false`                                                                                                                                                                                                                         |
+| `--skip_ascat`         | A boolean to skip `ascat`. ClairS-TO's Verdict germline tagging then falls back to Verdict's own purity and copy number estimate, which is still up to 0.14 from ASCAT's on the samples it was measured on — see [Verdict tags](output.md#clairs-to). Default = `false` |
+| `--skip_savana`        | A boolean to skip `savana` (SV + copy-number calling). Default = `false`                                                                                                                                                                                                |
+| `--skip_bamstats`      | A boolean to skip `bamstats`. Default = `false`                                                                                                                                                                                                                         |
+| `--skip_wakhan`        | A boolean to skip `wakhan`. Default = `false`                                                                                                                                                                                                                           |
+| `--skip_vep`           | A boolean to skip `vep`. Default = `false`                                                                                                                                                                                                                              |
+| `--skip_m6a`           | A boolean to skip `fibertools_m6a`, used if you have m6a calls but would still like nucleosome positions for PacBio data (ONT data is required to have m6a calls). Default = `false`                                                                                    |
+| `--skip_nanoplot`      | A boolean to skip NanoPlot QC on aligned and unaligned BAM files. Default = `false`                                                                                                                                                                                     |
+| `--skip_normalfiber`   | A boolean to skip fibertools processing for the normal sample. Default = `false`                                                                                                                                                                                        |
+| `--skip_modcall`       | A boolean to skip Longphase `modcall`, the 5mC base-modification calling whose VCF is used as extra evidence during phasing. Unrelated to the modkit pileup (see `--skip_modkit`). Default = `false`                                                                    |
+| `--skip_modkit`        | A boolean to skip the modkit pileup step. Default = `false`                                                                                                                                                                                                             |
+| `--skip_whatshapstats` | A boolean to skip WhatsHap phasing statistics. Default = `false`                                                                                                                                                                                                        |
+| `--skip_signatures`    | A boolean to skip mutational signature analysis (SigProfilerMatrixGenerator + SigProfilerAssignment). Default = `false`                                                                                                                                                 |
+| `--skip_report`        | A boolean to skip the final per-sample HTML report. Default = `false`                                                                                                                                                                                                   |
+
+#### Modkit options:
+
+| Parameter         | Description                                                                                                                                                                                                                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--modkit_args`   | Arguments passed to `modkit pileup`. The value replaces the default rather than extending it, so repeat `--cpg --modified-bases 5mC` when adding flags. An empty value gives the unfiltered pileup: use the `=` form, `--modkit_args=''`, or an empty `modkit_args` entry in a params file. Default = `--cpg --modified-bases 5mC` |
+| `--modkit_phased` | Run `modkit pileup --phased` on the Longphase-haplotagged BAMs, producing `_hp1`, `_hp2` and `_combined` bedMethyl files per sample. The pileup then requires small-variant calling, phasing and haplotagging to have succeeded for the sample. Default = `false`                                                                  |
+
+The pileup runs a patched modkit 0.6.4 image (`ghcr.io/ljwharbers/modkit`, `linux/amd64` only, built from [ljwharbers/modkit@pacbio-conflict-fix](https://github.com/ljwharbers/modkit/tree/pacbio-conflict-fix)): stock modkit drops PacBio HiFi reads whose 5mC and 5hmC probabilities sum above 1 and returns empty `--cpg` pileups on them ([nanoporetech/modkit#612](https://github.com/nanoporetech/modkit/issues/612)). Conda and `arm64` are not supported for this step; use `--skip_modkit` there.
 
 #### LONGPHASE options:
 
@@ -171,6 +206,32 @@ For structural variants, the CHM13 panel of normals is a merged panel combining 
 | `--vep_custom`         | A full path to a vcf file containing custom variants for annotation. Must be bgzipped and have `.vcf.gz` format. Default = `null`                |
 | `--vep_custom_tbi`     | A full path to a index file for cutom vcf for vep. Default = `null`                                                                              |
 | `--download_vep_cache` | A boolean to automatically download the VEP cache if not found locally. Default = `false`                                                        |
+
+#### VEP plugin options:
+
+The plugin data is **on by default** on `--genome GRCh38` and `--genome CHM13`; setting a
+parameter overrides its default, `--skip_vep_plugins` turns the set off, and CADD and EVE are
+opt-in. See [VEP plugins](#vep-plugins) for sizes, licence terms and per-assembly availability.
+
+| Parameter                    | Description                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `--skip_vep_plugins`         | Annotate with VEP alone, fetching no plugin data. Default = `false`                                                      |
+| `--vep_alphamissense`        | AlphaMissense GRCh38 score file, for the `AlphaMissense` plugin. GRCh38 only                                             |
+| `--vep_alphamissense_tbi`    | Index for `--vep_alphamissense`. Required whenever `--vep_alphamissense` is set                                          |
+| `--vep_alphamissense_aa`     | AlphaMissense protein-space release, or a table already built from it, for the `AlphaMissenseProtein` plugin. CHM13 only |
+| `--vep_alphamissense_aa_tbi` | Index for `--vep_alphamissense_aa`. Required whenever `--vep_alphamissense_aa` is set                                    |
+| `--vep_polyphen_sift_db`     | Ensembl pangenome PolyPhen/SIFT SQLite database, for the `PolyPhen_SIFT` plugin. Needed on CHM13 only                    |
+| `--vep_clinvar`              | ClinVar VCF, added as a VEP `--custom` annotation                                                                        |
+| `--vep_clinvar_tbi`          | Index for `--vep_clinvar`. Required whenever `--vep_clinvar` is set                                                      |
+| `--vep_clinvar_fields`       | Comma-separated ClinVar INFO fields to carry through. Default = `"CLNSIG,CLNREVSTAT,CLNDN"`                              |
+| `--vep_cadd_snv`             | CADD SNV score file, for the `CADD` plugin. No default — 81 GB, so opt-in; prefer a local path. GRCh38 only              |
+| `--vep_cadd_snv_tbi`         | Index for `--vep_cadd_snv`. Required whenever `--vep_cadd_snv` is set                                                    |
+| `--vep_cadd_indel`           | CADD indel score file, for the `CADD` plugin. No default — opt-in. GRCh38 only                                           |
+| `--vep_cadd_indel_tbi`       | Index for `--vep_cadd_indel`. Required whenever `--vep_cadd_indel` is set                                                |
+| `--vep_revel`                | REVEL release zip, or a prepared score file, for the `REVEL` plugin. GRCh38 only                                         |
+| `--vep_revel_tbi`            | Index for `--vep_revel`. Required only when `--vep_revel` is an already-prepared file                                    |
+| `--vep_eve`                  | EVE release zip, or a merged VCF, for the `EVE` plugin. **Not** on by default. GRCh38 only. Default = `null`             |
+| `--vep_eve_tbi`              | Index for `--vep_eve`. Required only when `--vep_eve` is an already-merged VCF. Default = `null`                         |
 
 #### Minimap2 Options
 
@@ -224,11 +285,98 @@ canonical chromosomes via a genome-specific `--contigs` file.
 | ------------------------ | --------------------------------------------------------------------------------------------------------------------- |
 | `--savana_pb_minsupport` | Minimum supporting reads for SAVANA to call a variant on PacBio samples (`--min_support` with `--pb`). Default = `10` |
 
+#### Report Options
+
+| Parameter             | Description                                                                                                                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--report_gene_panel` | Gene panel(s) applied when the report opens, as a comma-separated list. Each entry is `none` (no filtering), a builtin panel name (`lymphoid` or `sarcoma`), or a path to a TSV file with a `gene` column. Default = `null`, i.e. unfiltered |
+
+The report is rendered by [lrsomatic_report](https://github.com/ljwharbers/lrsomatic_report) from
+`ghcr.io/ljwharbers/lrsomatic-report` (`ghcr.io/ljwharbers/lrsomatic-report-sif` under
+Singularity/Apptainer), pinned to a tag in
+[`modules/local/lrsomaticreport/main.nf`](../modules/local/lrsomaticreport/main.nf). Images are
+built for `linux/amd64` only and **Conda is not supported for this step**; use `--skip_report`
+under `-profile conda`/`mamba`. Builtin gene panels live in
+[`assets/gene_lists/`](../assets/gene_lists/README.md): a TSV dropped there becomes a valid
+`--report_gene_panel` value.
+
+Gene panel filtering is a view, not a filter on the data: every builtin panel is embedded in the
+report and can be ticked or unticked in the browser; `--report_gene_panel` only decides which are
+ticked on load. A custom panel is a tab-separated file with a header row and at least a `gene`
+column:
+
+```tsv
+gene	panel	note
+TP53	mypanel	Tumour suppressor
+KRAS	mypanel	Oncogene
+```
+
+Optional `chrom`, `start` and `end` columns (all three or none, with the reference declared as a
+`# reference: hg38` line or a `reference` column) switch SV matching from the VEP gene symbol to
+position, and an optional `applies_to` column (`snv`, `sv` or blank) scopes a gene to one table.
+See [`assets/gene_lists/README.md`](../assets/gene_lists/README.md) for the full format.
+
+> **The builtin `lymphoid` panel was rebuilt** in the release that added `applies_to`: 234 rows
+> scoped per table, where it had 72 genes filtering both. `--report_gene_panel lymphoid` therefore
+> gives different filtered tables across that change. `sarcoma` is unchanged.
+
+```bash
+nextflow run IntGenomicsLab/lrsomatic \
+    -profile <docker/singularity> \
+    --input samplesheet.csv \
+    --outdir results \
+    --report_gene_panel /path/to/mypanel.tsv
+```
+
+##### Applying several panels at once
+
+Pass a comma-separated list to open the report with several panels applied. They are
+**unioned**: a variant or SV is kept if it hits any of them. Builtin names and custom paths
+can be mixed freely.
+
+```bash
+    --report_gene_panel lymphoid,sarcoma
+    --report_gene_panel 'lymphoid,/path/to/mypanel.tsv'
+```
+
+With two or more panels active, each `panel_hit` entry in the SV table gains a trailing `[panel]`
+naming which one matched.
+
+An entry containing a `/` or ending in `.tsv` is read as a panel file; anything else is a builtin
+name, so `--report_gene_panel mypanel` is looked up as a builtin even if a file called `mypanel`
+exists.
+
+Checked at launch:
+
+- `none` cannot be combined with a real panel.
+- A panel file that does not exist, or a builtin name that is not bundled, is an error.
+- Two panel files sharing a base name cannot be combined; rename one.
+
 #### WAKHAN Options
 
 | Parameter         | Description                                                                                             |
 | ----------------- | ------------------------------------------------------------------------------------------------------- |
 | `--wakhan_chroms` | A string specifying a subset of chromosomes for WAKHAN to process, e.g. `"chr1,chr2"`. Default = `null` |
+
+#### Mutational Signature Options
+
+Mutational signature analysis runs [SigProfilerMatrixGenerator](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator) on the PASS SNVs and indels of each sample's phased somatic VCF and fits COSMIC signatures per sample with [SigProfilerAssignment](https://github.com/SigProfilerSuite/SigProfilerAssignment). It needs SigProfilerMatrixGenerator's per-genome payload (~3 GB), which is not shipped with the pipeline. Either:
+
+- run once with `--download_sigprofiler_genome`; the payload is installed, checksum-verified and published to `<outdir>/cache/sigprofiler/volume`, or
+- point `--sigprofiler_genome_dir` at an existing SigProfilerMatrixGenerator volume (a directory containing `tsb/<genome>/`, e.g. one created with `SigProfilerMatrixGenerator install GRCh38 --volume <dir>` or the published cache from a previous run).
+
+Running with neither, and without `--skip_signatures`, stops the pipeline at start-up.
+
+| Parameter                                   | Description                                                                                                                                                                                         |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--sigprofiler_genome_dir`                  | Full path to a SigProfilerMatrixGenerator volume containing `tsb/<sigprofiler_genome>/`. Default = `null`                                                                                           |
+| `--download_sigprofiler_genome`             | A boolean to download and install the genome payload during the run (published to `<outdir>/cache/sigprofiler/volume`). Default = `false`                                                           |
+| `--sigprofiler_cosmic_version`              | COSMIC reference signature version fitted by SigProfilerAssignment. Default = `3.6`                                                                                                                 |
+| `--sigprofiler_exclude_signature_subgroups` | Comma-separated SigProfilerAssignment signature subgroups to exclude from the fit, e.g. `"Artifact_signatures,Lymphoid_signatures"` (see the SigProfilerAssignment documentation). Default = `null` |
+| `--sigprofiler_matrix_args`                 | Extra arguments for `SigProfilerMatrixGenerator matrix_generator`. Default = `"--plot"`                                                                                                             |
+| `--sigprofiler_assignment_args`             | Extra arguments for `SigProfilerAssignment cosmic_fit`, e.g. `"--make_plots False"`. Default = `null`                                                                                               |
+
+Both tools run from `ghcr.io/ljwharbers/sigprofiler`, which adds CHM13 support not yet in a SigProfiler release: SigProfilerMatrixGenerator from the branch behind [SigProfilerSuite/SigProfilerMatrixGenerator#250](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator/pull/250) and SigProfilerAssignment from [ljwharbers/SigProfilerAssignment](https://github.com/ljwharbers/SigProfilerAssignment/tree/chm13-t2t-support), with COSMIC SBS/DBS signatures renormalised to CHM13. ID83 signatures always use the GRCh37 set. Conda is not supported for this step.
 
 #### Variant Filtering and Combining Options
 
@@ -245,11 +393,11 @@ These options control how variants from multiple callers are filtered and merged
 
 #### PON Options
 
-| Parameter                | Description                                                                                                                                                                                                                                  |
-| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--clairsto_pon_vcfs`    | Full path to one or more Panel of Normals VCF files for ClairS-TO small variant filtering. Default = `null`                                                                                                                                  |
-| `--clairsto_pon_flags`   | Population allele matching flags for ClairS-TO PON VCFs (one per VCF, comma-separated). Default = `null`                                                                                                                                     |
-| `--deepsomatic_pon_vcfs` | Full path to one or more bgzipped, tabix-indexed PON VCF files (for example, `.vcf.gz`) passed to DeepSomatic `--population_vcfs`. If not set, uses container-bundled defaults in tumor-only mode or no PON in paired mode. Default = `null` |
+| Parameter                | Description                                                                                                                                                                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--clairsto_pon_vcfs`    | Full path to one or more Panel of Normals VCF files for ClairS-TO small variant filtering. Default = `null`, meaning the set for `--genome` is used: four VCFs on GRCh38, five on CHM13. Supplying VCFs replaces that set entirely rather than adding to it |
+| `--clairsto_pon_flags`   | Population allele matching flags for ClairS-TO PON VCFs (one per VCF, comma-separated). Default = `null`, meaning the flags that go with the `--genome` set. There must be exactly one flag per VCF, or the run stops at startup                            |
+| `--deepsomatic_pon_vcfs` | Full path to one or more bgzipped, tabix-indexed PON VCF files (for example, `.vcf.gz`) passed to DeepSomatic `--population_vcfs`. If not set, uses container-bundled defaults in tumor-only mode or no PON in paired mode. Default = `null`                |
 
 #### Advanced Options
 
@@ -262,15 +410,19 @@ These options control how variants from multiple callers are filtered and merged
 
 The following parameters are automatically populated from the `--genome` iGenomes configuration and do not normally need to be set manually. They can be overridden when using a custom genome or reference build not present in the iGenomes configuration.
 
-| Parameter          | Description                                                                                                                                  |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--fasta`          | Full path to the reference FASTA file. Auto-populated from `--genome`. Override for custom genomes.                                          |
-| `--bed_file`       | BED file of callable/target regions passed to SEVERUS for SV calling. Auto-populated from `--genome`.                                        |
-| `--pon_file`       | Panel of Normals breakpoint table (bgzipped CSV) for SEVERUS somatic SV filtering in tumor-only mode. Auto-populated from `--genome`.        |
-| `--centromere_bed` | BED file of centromere coordinates passed to WAKHAN. Auto-populated from `--genome`.                                                         |
-| `--genome_name`    | Assembly name string passed to ASCAT for genome-specific reference file selection. Auto-populated from `--genome`.                           |
-| `--vep_genome`     | VEP genome identifier (e.g. `GRCh38`, `T2T-CHM13v2.0`). Auto-populated from `--genome`. Override for CHM13 or custom assemblies.             |
-| `--vep_species`    | VEP species identifier. Auto-populated from `--genome`. Override for non-standard assemblies (e.g. `homo_sapiens_gca009914755v4` for CHM13). |
+| Parameter                                                                          | Description                                                                                                                                                                                                                                         |
+| ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--fasta`                                                                          | Full path to the reference FASTA file. Auto-populated from `--genome`. Override for custom genomes.                                                                                                                                                 |
+| `--bed_file`                                                                       | BED file of callable/target regions passed to SEVERUS for SV calling. Auto-populated from `--genome`.                                                                                                                                               |
+| `--pon_file`                                                                       | Panel of Normals breakpoint table (bgzipped CSV) for SEVERUS somatic SV filtering in tumor-only mode. Auto-populated from `--genome`.                                                                                                               |
+| `--centromere_bed`                                                                 | BED file of centromere coordinates passed to WAKHAN. Auto-populated from `--genome`.                                                                                                                                                                |
+| `--genome_name`                                                                    | Assembly name string passed to ASCAT for genome-specific reference file selection. Auto-populated from `--genome`.                                                                                                                                  |
+| `--vep_genome`                                                                     | VEP genome identifier (e.g. `GRCh38`, `T2T-CHM13v2.0`). Auto-populated from `--genome`. Override for CHM13 or custom assemblies.                                                                                                                    |
+| `--vep_species`                                                                    | VEP species identifier. Auto-populated from `--genome`. Override for non-standard assemblies (e.g. `homo_sapiens_gca009914755v4` for CHM13).                                                                                                        |
+| `--sigprofiler_genome`                                                             | SigProfilerMatrixGenerator / SigProfilerAssignment genome name (`GRCh38` or `CHM13-T2T`). Auto-populated from `--genome`.                                                                                                                           |
+| `--sigprofiler_genome_url`                                                         | URL of the `<sigprofiler_genome>.tar.gz` payload for `--download_sigprofiler_genome`; unset means the AlexandrovLab FTP. Auto-populated from `--genome` (set for CHM13 only).                                                                       |
+| `--ascat_allele_files`, `--ascat_loci_files`, `--ascat_gc_file`, `--ascat_rt_file` | ASCAT loci, allele, GC content and replication timing files. Auto-populated from `--genome`. Also used to build the ClairS-TO Verdict CNA resources on CHM13; CHM13 has no RT file, so that correction is GC-only.                                  |
+| ClairS-TO PON VCFs                                                                 | The four (GRCh38) or five (CHM13) VCFs behind `--clairsto_pon_vcfs`: `gnomad`, `dbsnp`, `onekgenomes`, `colors`, and on CHM13 also `asap`. Auto-populated from `--genome`; override with `--clairsto_pon_vcfs` and `--clairsto_pon_flags` together. |
 
 ### Updating the pipeline
 
@@ -292,6 +444,169 @@ To further assist in reproducibility, you can use share and reuse [parameter fil
 
 > [!TIP]
 > If you wish to share such profile (such as upload as supplementary material for academic publications), make sure to NOT include cluster specific paths to files, nor institutional specific profiles.
+
+## VEP plugins
+
+VEP is given extra pathogenicity and clinical-significance annotation through plugins. On
+`--genome GRCh38` and `--genome CHM13` these are **on by default**: the pipeline downloads the
+resources for the assembly and reshapes the ones VEP cannot read as published. Pass
+`--skip_vep_plugins` to annotate with VEP alone; the plugins are also off under `--igenomes_ignore`
+or with any other `--genome`.
+
+Every default points at the resource's original source, except the AlphaMissense GRCh38 tabix index
+and the CHM13 protein-space table, which the lab hosts because neither is published in a form VEP
+can use (both CC BY 4.0 — see `CITATIONS.md`). Complying with each licence remains your
+responsibility, and **CADD, REVEL and EVE are free for non-commercial use only** — see the callout
+at the end of this section.
+
+Plugins are applied to the germline and somatic VEP runs, not to the structural-variant run.
+
+### What is enabled by default, per assembly
+
+| Tool              | GRCh38                                   | CHM13                         | Default download                                    |
+| ----------------- | ---------------------------------------- | ----------------------------- | --------------------------------------------------- |
+| **SIFT**          | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | CHM13: 13 GB database                               |
+| **PolyPhen**      | already in the VEP cache, no file needed | `PolyPhen_SIFT` plugin        | as above, the same database                         |
+| **AlphaMissense** | `AlphaMissense` plugin                   | `AlphaMissenseProtein` plugin | 613 MB (GRCh38) / 1.1 GB (CHM13)                    |
+| **ClinVar**       | `--custom` annotation                    | `--custom`, CHM13-lifted VCF  | 105 MB (GRCh38) / 190 MB (CHM13)                    |
+| **CADD**          | `CADD` plugin, opt-in                    | not available — see below     | none — `--vep_cadd_snv` enables it (81 GB + 1.2 GB) |
+| **REVEL**         | `REVEL` plugin                           | not available — see below     | 667 MB release zip                                  |
+| **EVE**           | `EVE` plugin, opt-in                     | not available — see below     | none — `--vep_eve` enables it (9.6 GB)              |
+
+That comes to roughly **1.4 GB on GRCh38** and **14.3 GB on CHM13** for a first run, the CHM13
+figure being almost entirely the pangenome database. On GRCh38, SIFT and PolyPhen already come out
+of the VEP cache through the default `--everything`, so `--vep_polyphen_sift_db` is only used on
+CHM13.
+
+Two resources are left opt-in, both because of their size:
+
+- **CADD** — the SNV table alone is 81 GB, plus 1.2 GB of indels, and it is re-staged on every run
+  that is not a `-resume`. Enable it with `--vep_cadd_snv <file> --vep_cadd_snv_tbi <file>` and, for
+  indels, `--vep_cadd_indel` with its `_tbi`; download once and point at a local copy.
+- **EVE** — a 9.6 GB zip of per-protein VCFs that then has to be merged, for a predictor
+  AlphaMissense largely covers. Enable it with `--vep_eve https://evemodel.org/api/proteins/bulk/download/`
+  (or a path to the zip, or to a VCF you have already merged).
+
+### Downloading and reusing the data
+
+Prepared REVEL and EVE files are published to `<outdir>/vep_plugins/`, alongside their indexes, so
+a later run can point `--vep_revel` / `--vep_revel_tbi` (or the `--vep_eve` pair) at them and skip
+both the download and the reshaping. The two AlphaMissense tables are fetched already indexed.
+
+> [!IMPORTANT]
+> `<outdir>/vep_plugins/` holds data that is free for non-commercial use only. Exclude it when you
+> share or archive a results directory — passing it on is redistribution, which those licences do
+> not grant you.
+
+Within a run, downloaded resources are shared by every VEP task. Across runs they are reused only
+with `-resume`; a fresh run in the same work directory downloads everything again.
+
+For repeat runs, download once and pass local paths, which skips both the download and the
+preparation step:
+
+```bash
+# once
+bin/prepare_vep_plugin_data.sh revel /data/vep/revel-v1.3_all_chromosomes.zip /data/vep
+
+# then, on every run
+nextflow run IntGenomicsLab/lrsomatic \
+  --input samplesheet.csv --outdir ./results --genome GRCh38 \
+  --vep_cadd_snv /data/vep/whole_genome_SNVs.tsv.gz \
+  --vep_cadd_snv_tbi /data/vep/whole_genome_SNVs.tsv.gz.tbi \
+  --vep_revel /data/vep/revel_grch38.tsv.gz \
+  --vep_revel_tbi /data/vep/revel_grch38.tsv.gz.tbi \
+  -profile singularity
+```
+
+Everything except REVEL and EVE needs no preparation — download it with `curl` and pass the path.
+`bin/prepare_vep_plugin_data.sh` is what the pipeline itself runs for those two, so a file you build
+with it is identical to one it would prepare; run it with `--help` for usage.
+
+Whether an index is required depends on the shape of what you supply:
+
+- **AlphaMissense, ClinVar and CADD** are used exactly as given, so their `_tbi` parameter is
+  always required alongside them. Overriding a data file drops the default index: supply both, or
+  neither.
+- **REVEL and EVE** ship as zip archives. Pass a `.zip` and the pipeline unpacks and reshapes it;
+  pass a prepared file and its index to use it directly. Remote zips are fetched with `wget` rather
+  than staged by Nextflow, and EVE's 9.6 GB archive serves slowly, so expect hours.
+
+### Where each default comes from
+
+| Resource                  | Source                                                                                                                            | Size   | Prepared by the pipeline                   | Licence                      |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------ | ------------------------------------------ | ---------------------------- |
+| AlphaMissense (GRCh38)    | `https://storage.googleapis.com/dm_alphamissense/AlphaMissense_hg38.tsv.gz`, with an index we host                                | 613 MB | no, the index is fetched ready             | CC BY 4.0                    |
+| AlphaMissense (protein)   | a gene-symbol-keyed table we host, built from the AlphaMissense protein-space release                                             | 1.1 GB | no, fetched ready — see `CITATIONS.md`     | CC BY 4.0                    |
+| Pangenome PolyPhen/SIFT   | `https://ftp.ensembl.org/pub/release-115/variation/pangenomes/Human/homo_sapiens_pangenome_PolyPhen_SIFT_20240502.db`             | 13 GB  | no, it is an SQLite database               | Ensembl / EMBL-EBI open      |
+| ClinVar (GRCh38)          | `clinvar_20260829.vcf.gz` under `https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/` (+ `.tbi`)                | 105 MB | no, `.tbi` is published                    | public domain                |
+| ClinVar (CHM13)           | `clinvar_20240624_GCA_009914755.4.vcf.gz` under `https://ftp.ensembl.org/pub/rapid-release/species/Homo_sapiens/GCA_009914755.4/` | 190 MB | no, `.tbi` is published                    | public domain                |
+| CADD v1.7 SNVs (opt-in)   | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/whole_genome_SNVs.tsv.gz` (+ `.tbi`)                                 | 81 GB  | no, `.tbi` is published                    | free for non-commercial use  |
+| CADD v1.7 indels (opt-in) | `https://krishna.gs.washington.edu/download/CADD/v1.7/GRCh38/gnomad.genomes.r4.0.indel.tsv.gz` (+ `.tbi`)                         | 1.2 GB | no, `.tbi` is published                    | free for non-commercial use  |
+| REVEL v1.3                | `https://rothsj06.dmz.hpc.mssm.edu/revel-v1.3_all_chromosomes.zip`                                                                | 667 MB | unpacked, re-sorted on GRCh38, indexed     | free for non-commercial use  |
+| EVE (opt-in)              | `https://evemodel.org/api/proteins/bulk/download/`                                                                                | 9.6 GB | unpacked, per-protein VCFs merged, indexed | non-commercial; see the site |
+
+### Example: GRCh38
+
+Defaults do the work, so nothing plugin-related is needed:
+
+```bash
+nextflow run IntGenomicsLab/lrsomatic \
+  --input samplesheet.csv \
+  --outdir ./results \
+  --genome GRCh38 \
+  -profile docker
+```
+
+### Example: CHM13
+
+```bash
+nextflow run IntGenomicsLab/lrsomatic \
+  --input samplesheet.csv \
+  --outdir ./results \
+  --genome CHM13 \
+  --vep_cache $HOME/.vep \
+  --vep_cache_version 107 \
+  -profile docker
+```
+
+Passing a GRCh38-only resource together with a CHM13 cache is rejected before the run starts,
+rather than failing hours later inside VEP or after a long download.
+
+### How annotation reaches CHM13 at all
+
+The CHM13 cache is the Ensembl rapid-release HPRC cache: gene and transcript models only, with no
+variation, RefSeq or regulatory data. Every genome-coordinate-keyed score resource is published for
+GRCh37/GRCh38 alone, and there are no lifted score tracks for the assembly elsewhere either.
+
+Two of these predictors get there anyway, because they score _proteins_ rather than genome positions:
+
+- **`PolyPhen_SIFT`** keys its lookup on the MD5 of the peptide sequence, which is why Ensembl's
+  pangenome database covers the HPRC assemblies.
+- **`AlphaMissenseProtein`** (in `assets/vep_plugins/`) keys on gene symbol plus amino-acid
+  substitution, using a table built from AlphaMissense's protein-space release. A row is used only
+  when both amino acids match what VEP computed for the CHM13 transcript; otherwise it reports
+  `aa_mismatch` and no score. The `AlphaMissenseProtein_match` values are listed under
+  [plugin fields in `CSQ`](output.md#plugin-fields-in-the-csq-annotation).
+
+### What is not available, and why
+
+- **MutationTaster** — no VEP plugin exists, and the dbNSFP route is academic-only.
+- **CADD on CHM13** — CADD scores non-coding positions too, so it has no protein-space form to fall
+  back on.
+- **REVEL and EVE on CHM13** — neither licence clearly permits distributing a derived table;
+  AlphaMissense covers the same class of variant and is CC BY 4.0.
+- **SpliceAI** — not currently wired up on either assembly.
+
+> [!IMPORTANT]
+> **REVEL is enabled by default and is free for non-commercial use only**; CADD and EVE, if you
+> enable them, are the same. The pipeline cannot accept those terms on your behalf: if your work is
+> commercial, pass `--skip_vep_plugins`, or set only the resources you are licensed for.
+
+> [!IMPORTANT]
+> Check that contig naming matches your reference: the GRCh38 reference used here is GATK-style
+> (`chr1`), while NCBI's ClinVar VCF ships Ensembl-style names (`1`). VEP usually reconciles the two
+> for `--custom` files, but a name it cannot map annotates nothing rather than raising an error, so
+> confirm that `CLNSIG` values appear in an annotated VCF before trusting them.
 
 ## Core Nextflow arguments
 
@@ -330,7 +645,7 @@ If `-profile` is not specified, the pipeline will run locally and expect all sof
 - `apptainer`
   - A generic configuration profile to be used with [Apptainer](https://apptainer.org/)
 - `wave`
-  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow ` 24.03.0-edge` or later).
+  - A generic configuration profile to enable [Wave](https://seqera.io/wave/) containers. Use together with one of the above (requires Nextflow `24.03.0-edge` or later).
 - `conda`
   - A generic configuration profile to be used with [Conda](https://conda.io/docs/). Please only use Conda as a last resort i.e. when it's not possible to run the pipeline with Docker, Singularity, Podman, Shifter, Charliecloud, or Apptainer.
 

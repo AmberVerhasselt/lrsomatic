@@ -64,7 +64,8 @@ workflow PIPELINE_INITIALISATION {
         show_hidden,
         "",
         "",
-        command
+        command,
+        false
     )
 
     //
@@ -153,11 +154,8 @@ workflow PIPELINE_INITIALISATION {
         }
         .set { ch_samplesheet }
 
-    // Count replicates per sample+type and embed the count in meta as n_replicates.
-    // This allows downstream groupTuple() to use groupKey() for eager per-sample release
-    // instead of waiting for ALL samples to finish (global synchronization barrier).
-    // This groupTuple is safe: the source is a fully-materialized list from
-    // samplesheetToList(), so the channel closes immediately without blocking any process.
+    // n_replicates lets downstream groupTuple() use groupKey() for eager per-sample release. This
+    // groupTuple is safe: samplesheetToList() is already materialised, so the channel closes at once.
     ch_samplesheet
         .map { meta, bams -> [[meta.id, meta.type], meta, bams] }
         .groupTuple(by: 0)
@@ -240,6 +238,82 @@ workflow PIPELINE_COMPLETION {
 //
 def validateInputParameters() {
     genomeExistsError()
+    validateReportGenePanels()
+}
+
+//
+// Split --report_gene_panel into panel tokens (mirrored in conf/modules.config)
+//
+def reportGenePanelTokens(panel_spec) {
+    if (!panel_spec) {
+        return []
+    }
+    return panel_spec.toString().split(',').collect { it.trim() }.findAll { it }
+}
+
+//
+// Does a --report_gene_panel entry name a file rather than a builtin? Textual because conf/modules.config makes the same call without file()
+//
+def reportGenePanelIsFile(tok) {
+    return tok.contains('/') || tok.toLowerCase().endsWith('.tsv')
+}
+
+//
+// Builtin panel names shipped in assets/gene_lists, reference suffix dropped
+//
+def reportBuiltinGenePanels() {
+    def gene_lists_dir = file("${projectDir}/assets/gene_lists")
+    if (!gene_lists_dir.exists()) {
+        return []
+    }
+    return gene_lists_dir
+        .list()
+        .findAll { it.endsWith('.tsv') }
+        .collect { it.replaceFirst(/(\.(hg38|t2t))?\.tsv$/, '') }
+        .unique()
+        .sort()
+}
+
+//
+// Validate --report_gene_panel at launch so a typo fails before alignment and calling run
+//
+def validateReportGenePanels() {
+    if (params.skip_report) {
+        return
+    }
+    def tokens = reportGenePanelTokens(params.report_gene_panel)
+    if (!tokens) {
+        return
+    }
+
+    // "none" means unfiltered, so combining it with a real panel is contradictory
+    if (tokens.size() > 1 && tokens.any { it.toLowerCase() == 'none' }) {
+        error("--report_gene_panel: 'none' means unfiltered and cannot be combined with other panels, got '${params.report_gene_panel}'. Drop the 'none'.")
+    }
+
+    def named = tokens.findAll { tok -> tok.toLowerCase() != 'none' && !reportGenePanelIsFile(tok) }
+    def panel_files = tokens.findAll { tok -> reportGenePanelIsFile(tok) }
+
+    def missing = panel_files.findAll { tok -> !file(tok).exists() }
+    if (missing) {
+        error("--report_gene_panel: panel file not found: '${missing.join("', '")}'.")
+    }
+
+    def builtins = reportBuiltinGenePanels()
+    def unknown = named.findAll { tok -> !builtins.contains(tok) }
+    if (unknown) {
+        error("--report_gene_panel: '${unknown.join("', '")}' is not a builtin panel. Builtin panels: ${builtins ? builtins.join(', ') : '<none found>'}. To use a panel file give its path, or a name ending in '.tsv'; use 'none' for no filtering.")
+    }
+
+    // Panel files are staged side by side into gene_panels/, so equal base names collide
+    def duplicates = panel_files
+        .collect { tok -> file(tok).name }
+        .countBy { name -> name }
+        .findAll { _name, count -> count > 1 }
+        .keySet()
+    if (duplicates) {
+        error("--report_gene_panel: panel files sharing a base name cannot be used together ('${duplicates.join("', '")}'). Rename one of them.")
+    }
 }
 
 //
@@ -266,6 +340,223 @@ def getGenomeAttribute(attribute) {
         }
     }
     return null
+}
+
+//
+// Resolve a VEP plugin resource: an explicit --vep_* wins, else the per-assembly default
+//
+def vepPluginResource(name) {
+    return params[name] ?: getGenomeAttribute(name)
+}
+
+//
+// The target assembly: an explicit --vep_genome wins, else the per-assembly default
+//
+// Resolved rather than read off params.vep_genome, which workflows/lrsomatic.nf assigns at
+// runtime: an included module keeps its own params binding, so that write is never visible here
+//
+def vepTargetGenome() {
+    def explicit = params.containsKey('vep_genome') ? params.vep_genome : null
+    return explicit ?: getGenomeAttribute('vep_genome')
+}
+
+//
+// True when no plugin annotation should happen at all
+//
+def vepPluginsSkipped() {
+    return params.skip_vep || params.skip_vep_plugins
+}
+
+//
+// VEP plugin data params, each mapped to its index param, or to null when it needs none
+//
+def vepPluginIndexParams() {
+    return [
+        'vep_alphamissense'   : 'vep_alphamissense_tbi',
+        'vep_alphamissense_aa': 'vep_alphamissense_aa_tbi',
+        'vep_polyphen_sift_db': null,
+        'vep_clinvar'         : 'vep_clinvar_tbi',
+        'vep_cadd_snv'        : 'vep_cadd_snv_tbi',
+        'vep_cadd_indel'      : 'vep_cadd_indel_tbi',
+        'vep_revel'           : 'vep_revel_tbi',
+        'vep_eve'             : 'vep_eve_tbi'
+    ]
+}
+
+//
+// The index for a plugin data file, or null when there is none. Overriding the data file drops the
+// default index, which was built from different content
+//
+def vepPluginIndex(data_param) {
+    def index_param = vepPluginIndexParams()[data_param]
+    if (!index_param) {
+        return null
+    }
+    return params[index_param] ?: (params[data_param] ? null : getGenomeAttribute(index_param))
+}
+
+//
+// Whether a resource still has to be reshaped before VEP can read it
+//
+// Only REVEL and EVE are ever prepared, and the test is for what a prepared file looks like
+// (bgzipped) rather than for a release zip: EVE's download endpoint ends in a bare '/'.
+//
+def vepPluginNeedsPrep(data_param) {
+    def value = vepPluginResource(data_param)
+    return value &&
+        ['vep_revel', 'vep_eve'].contains(data_param) &&
+        !value.toString().toLowerCase().endsWith('.gz')
+}
+
+//
+// The filename a prep task writes, referenced by the VEP argument since plugins stage into the task root
+//
+def vepPluginPreparedName(data_param) {
+    return [
+        'vep_revel': 'revel_grch38.tsv.gz',
+        'vep_eve'  : 'eve_merged.vcf.gz'
+    ][data_param]
+}
+
+//
+// Exit if the plugin params contradict each other or the target assembly, before any download
+//
+def validateVepPluginParams() {
+    if (vepPluginsSkipped()) {
+        return
+    }
+
+    def index_advice = [
+        'vep_clinvar'         : 'ClinVar publishes a .tbi alongside every VCF.',
+        'vep_cadd_snv'        : 'CADD publishes a .tbi alongside every score file.',
+        'vep_cadd_indel'      : 'CADD publishes a .tbi alongside every score file.',
+        'vep_alphamissense'   : 'The release ships without an index; index it with `tabix -s 1 -b 2 -e 2 -S <leading non-data lines>`, or drop both to take the pre-indexed default.',
+        'vep_alphamissense_aa': 'Index the table with `tabix -s 1 -b 2 -e 2 -c "#"`, or drop both to take the prepared default.',
+        'vep_revel'           : 'Either supply the index, or pass the published revel-v1.3_all_chromosomes.zip to have both prepared.',
+        'vep_eve'             : 'Either supply the index, or pass the release -- https://evemodel.org/api/proteins/bulk/download/, or the zip it serves -- to have both prepared.'
+    ]
+
+    vepPluginIndexParams().each { data_param, index_param ->
+        if (index_param && vepPluginResource(data_param) && !vepPluginNeedsPrep(data_param) && !vepPluginIndex(data_param)) {
+            error("--${data_param}: set without --${index_param}. ${index_advice[data_param] ?: 'Both are required.'}")
+        }
+        // What the prep task writes is indexed from that output, so a supplied index cannot apply
+        if (index_param && params[index_param] && vepPluginNeedsPrep(data_param)) {
+            error("--${index_param}: cannot be combined with --${data_param} '${vepPluginResource(data_param)}', which the pipeline reshapes itself and indexes from the file it writes. Drop --${index_param}, or pass an already-prepared .gz as --${data_param}.")
+        }
+    }
+
+    def grch38_only = [
+        'vep_alphamissense': 'Use --vep_alphamissense_aa instead, which is keyed in protein space.',
+        'vep_cadd_snv'     : 'CADD scores non-coding positions and has no protein-space form, so it is unavailable on CHM13.',
+        'vep_cadd_indel'   : 'CADD scores non-coding positions and has no protein-space form, so it is unavailable on CHM13.',
+        'vep_revel'        : 'REVEL is published for GRCh37/GRCh38 only.',
+        'vep_eve'          : 'EVE is published for GRCh38 only.'
+    ]
+
+    def vep_genome = vepTargetGenome()
+
+    if (vep_genome == 'T2T-CHM13v2.0') {
+        grch38_only.each { data_param, advice ->
+            if (vepPluginResource(data_param)) {
+                error("--${data_param}: a GRCh38-only resource, which cannot be used with --vep_genome T2T-CHM13v2.0. ${advice}")
+            }
+        }
+    }
+    else if (vepPluginResource('vep_alphamissense_aa')) {
+        // vep_genome is null for a custom reference carrying no --genome
+        def target = vep_genome ? "On ${vep_genome} use" : 'Use'
+        error("--vep_alphamissense_aa: the CHM13 route to AlphaMissense. ${target} --vep_alphamissense instead.")
+    }
+
+    // The VEP module rewrites the first '--custom file=' in ext.args to the staged --vep_custom
+    // file, so without this placeholder a user's own VCF would take ClinVar's entry.
+    if (params.vep_custom && !(params.vep_args =~ /--custom file=/)) {
+        error("--vep_custom: needs a matching '--custom file=...' entry in --vep_args, which is where the staged file is substituted in. Add one, e.g. --vep_args '${params.vep_args} --custom file=placeholder,short_name=MyTrack,format=vcf,type=exact,coords=0'.")
+    }
+}
+
+//
+// Stage an already-usable plugin file and its index, returning the basename VEP should reference
+//
+def stageVepPluginFile(staged, data_param) {
+    def data_file = file(vepPluginResource(data_param), checkIfExists: true)
+    staged << data_file
+    def index = vepPluginIndex(data_param)
+    if (index) {
+        staged << file(index, checkIfExists: true)
+    }
+    return data_file.name
+}
+
+//
+// Register one resource: staged as supplied, or recorded for a prep task whose output name is returned
+//
+// A resource needing prep is kept as its raw value rather than a file(), since neither the REVEL nor
+// the EVE host can be staged by Nextflow -- PREPARE_VEP_PLUGINS fetches those with WGET instead.
+//
+def registerVepPlugin(staged, prepare, data_param) {
+    if (vepPluginNeedsPrep(data_param)) {
+        prepare[data_param] = vepPluginResource(data_param)
+        return vepPluginPreparedName(data_param)
+    }
+    return stageVepPluginFile(staged, data_param)
+}
+
+//
+// Resolve the plugins into the VEP argument string, the files to stage, and the releases to reshape
+//
+def resolveVepPlugins() {
+    if (vepPluginsSkipped()) {
+        return [ args: '', ready_files: [], prepare: [:] ]
+    }
+
+    def staged = []
+    def prepare = [:]
+    def args = []
+
+    if (vepPluginResource('vep_alphamissense')) {
+        args << "--plugin AlphaMissense,file=${registerVepPlugin(staged, prepare, 'vep_alphamissense')}"
+    }
+
+    if (vepPluginResource('vep_alphamissense_aa')) {
+        // Our own plugin, so the .pm travels with its data; --dir_plugins only prepends to @INC
+        staged << file("${projectDir}/assets/vep_plugins/AlphaMissenseProtein.pm", checkIfExists: true)
+        args << "--dir_plugins ."
+        args << "--plugin AlphaMissenseProtein,file=${registerVepPlugin(staged, prepare, 'vep_alphamissense_aa')}"
+    }
+
+    if (vepPluginResource('vep_polyphen_sift_db')) {
+        args << "--plugin PolyPhen_SIFT,db=${registerVepPlugin(staged, prepare, 'vep_polyphen_sift_db')}"
+    }
+
+    if (vepPluginResource('vep_clinvar')) {
+        // --custom takes a %-separated field list, unlike the comma-separated form used everywhere else
+        def fields = (params.vep_clinvar_fields ?: '').tokenize(',').collect { it.trim() }.findAll().join('%')
+        def clinvar = "--custom file=${registerVepPlugin(staged, prepare, 'vep_clinvar')},short_name=ClinVar,format=vcf,type=exact,coords=0"
+        args << (fields ? "${clinvar},fields=${fields}" : clinvar)
+    }
+
+    if (vepPluginResource('vep_cadd_snv') || vepPluginResource('vep_cadd_indel')) {
+        def cadd = []
+        if (vepPluginResource('vep_cadd_snv')) {
+            cadd << "snv=${registerVepPlugin(staged, prepare, 'vep_cadd_snv')}"
+        }
+        if (vepPluginResource('vep_cadd_indel')) {
+            cadd << "indels=${registerVepPlugin(staged, prepare, 'vep_cadd_indel')}"
+        }
+        args << "--plugin CADD,${cadd.join(',')}"
+    }
+
+    if (vepPluginResource('vep_revel')) {
+        args << "--plugin REVEL,file=${registerVepPlugin(staged, prepare, 'vep_revel')}"
+    }
+
+    if (vepPluginResource('vep_eve')) {
+        args << "--plugin EVE,file=${registerVepPlugin(staged, prepare, 'vep_eve')}"
+    }
+
+    return [ args: args.join(' '), ready_files: staged, prepare: prepare ]
 }
 
 //
@@ -343,4 +634,56 @@ def methodsDescriptionText(mqc_methods_yaml) {
     def description_html = engine.createTemplate(methods_text).make(meta)
 
     return description_html.toString()
+}
+
+//
+// Validate a user-supplied Verdict CNA resource directory, returning it as a file object
+//
+// ClairS-TO accepts exactly one <prefix>chr1.txt per sub-directory and one GC_*.txt, and only the
+// directory itself is staged into the task, so a link out of it leaves Verdict quietly disabled.
+//
+def validateClairstoCnaResources(resource_dir) {
+    def dir = file(resource_dir, type: 'dir')
+    if (!dir.exists() || !dir.isDirectory()) {
+        error("--clairsto_cna_resources: '${resource_dir}' is not a directory.")
+    }
+
+    ['loci_files', 'allele_files'].each { sub ->
+        def sub_dir = dir.resolve(sub)
+        if (!sub_dir.exists() || !sub_dir.isDirectory()) {
+            error("--clairsto_cna_resources: '${resource_dir}' has no ${sub}/ sub-directory. Expected layout: loci_files/<prefix>chr1.txt ..., allele_files/<prefix>chr1.txt ..., GC_<name>.txt, and optionally RT_<name>.txt.")
+        }
+        def first_contig = sub_dir.listFiles().findAll { entry -> entry.name.endsWith('chr1.txt') && entry.name.size() > 'chr1.txt'.size() }
+        if (first_contig.size() != 1) {
+            error("--clairsto_cna_resources: ${sub}/ holds ${first_contig.size()} files ending in 'chr1.txt'; ClairS-TO derives the per-contig prefix from exactly one. Keep one resource set per directory.")
+        }
+    }
+
+    def gc_files = dir.listFiles().findAll { entry -> entry.name.startsWith('GC_') && entry.name.endsWith('.txt') }
+    if (gc_files.size() != 1) {
+        error("--clairsto_cna_resources: '${resource_dir}' holds ${gc_files.size()} files matching GC_*.txt; ClairS-TO needs exactly one.")
+    }
+
+    def real_root = dir.toRealPath()
+    def unusable = []
+    [dir, dir.resolve('loci_files'), dir.resolve('allele_files')].each { sub_dir ->
+        sub_dir.listFiles().each { entry ->
+            if (java.nio.file.Files.isSymbolicLink(entry)) {
+                try {
+                    if (!entry.toRealPath().startsWith(real_root)) {
+                        unusable << entry.name
+                    }
+                }
+                catch (java.io.IOException _e) {
+                    // dangling link: unusable for the same reason
+                    unusable << entry.name
+                }
+            }
+        }
+    }
+    if (unusable) {
+        error("--clairsto_cna_resources: '${resource_dir}' contains links pointing outside the directory (e.g. ${unusable.take(3).join(', ')}). Only the directory itself is staged into the task, so those files would be missing inside the container and Verdict would be disabled. Materialise a self-contained copy first, e.g. `cp -rL ${resource_dir} <dest>`, and pass that.")
+    }
+
+    return dir
 }
