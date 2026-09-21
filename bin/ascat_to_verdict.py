@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
-"""Rewrite ASCAT's purity/ploidy and segments tables as the two files Verdict's tagging step reads.
+"""Rewrite ASCAT's purityploidy/segments tables into the two files ClairS-TO's tag_germline_variant.py reads.
 
-ASCAT (R) writes
-    <sample>.purityploidy.txt   AberrantCellFraction  Ploidy
-    <sample>.segments.txt       sample  chr  startpos  endpos  nMajor  nMinor      (chr as 1..22, X)
-ClairS-TO's tag_germline_variant.py reads
-    <sample>_Tumor_Purity_Ploidy.txt   Sample  Purity  Ploidy  GoodnessOfFit
-    <sample>_Tumor_CNA.txt             Sample  Chromosome  StartPosition  EndPosition  nMajor  nMinor
-and matches a variant to a segment by exact contig name, so segment contigs are spelled the way
-the VCF spells them (chr1 or 1).
-
-When ASCAT found no purity/ploidy solution it writes 0 and 0. Verdict would take a purity of 0 at
-face value, so no purity file is written in that case and the caller passes the calls through.
+Segment contigs are respelled to match the VCF (chr1 vs 1), since Verdict matches on exact contig name.
+If ASCAT found no solution (purity 0), no purity file is written so Verdict tags nothing.
 """
 import argparse
 import gzip

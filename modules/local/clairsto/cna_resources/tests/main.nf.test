@@ -58,9 +58,8 @@ nextflow_process {
         }
     }
 
-    // What the pipeline actually hands over for CHM13: UNZIP emits its output directory, and
-    // these archives hold a folder of the same name, so the collected channel is that one
-    // nested directory rather than the per-contig files. ASCAT consumes the same shape.
+    // UNZIP emits a directory holding a same-named folder, so the channel carries that nested
+    // directory, not the per-contig files (the shape ASCAT and the pipeline pass for CHM13).
     test("set arrives as one directory - per-contig files are found inside it") {
 
         when {

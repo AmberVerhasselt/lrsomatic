@@ -316,7 +316,7 @@ Present in **tumor-only** samples (no matched normal).
 | `somatic.vcf.gz`                   | SNV and indel calls marked as PASS and without a germline tag                                                                           |
 | `somatic.vcf.gz.tbi`               | Index for somatic small variant calls                                                                                                   |
 
-The germline/somatic split comes from two assembly-specific sources: a panel of normals of population allele databases, and ClairS-TO's Verdict module, which tags each call as germline, somatic or subclonal somatic from the sample's tumour purity and allele-specific copy number. Both are supplied for GRCh38 and CHM13, so the split is assembly-correct on either. Unless ASCAT is skipped, the purity and copy number Verdict uses are ASCAT's — the same profile reported under `ascat/` — because Verdict's own estimate of them proved unreliable (see the changelog for #197); with `--skip_ascat`, Verdict estimates them itself. The pinned ClairS-TO image fixes the defects that made Verdict's fit land near ploidy 3, but its purity still differs from ASCAT's by up to 0.14 on the samples it was measured on and moves with the segmentation penalty, which is tuned inside the image. So a `--skip_ascat` run's tags rest on an estimate that has not been reconciled with ASCAT — and since the tagging threshold is 0.6, that difference can decide whether a sample is tagged at all. Verdict only applies tags when the tumour purity is at most 0.6, so above that the VCFs carry no Verdict tags and germline calls are separated by the panel of normals alone. Verdict's own estimate is also disabled — with a warning in the ClairS-TO log — if its reference resources cannot belong to the reference the BAM was aligned to. See [CHM13 support](usage.md#chm13-support) in the usage docs.
+The germline/somatic split comes from a panel of normals and from ClairS-TO's Verdict module, which tags each call as germline, somatic or subclonal somatic from tumour purity and allele-specific copy number. Unless `--skip_ascat` is set these come from the pipeline's ASCAT run (the profile under `ascat/`); otherwise Verdict estimates them itself, and its purity can differ from ASCAT's enough to cross the 0.6 threshold above which no Verdict tags are applied. Verdict is also disabled, with a warning in the ClairS-TO log, if its resources cannot belong to the reference. See [CHM13 support](usage.md#chm13-support).
 
 #### `severus`
 
@@ -455,9 +455,8 @@ Phased variant calls produced by Longphase. Present in all samples.
 #### Plugin fields in the `CSQ` annotation
 
 The germline and somatic VCFs carry these extra subfields inside VEP's `CSQ` INFO annotation, on
-top of what `--everything` already produces. They are absent from the SV VCF, which is annotated
-without plugins. Read them out with `bcftools +split-vep`. Which appear depends on the assembly and
-on which resources were enabled — see [VEP plugins](usage.md#vep-plugins).
+top of what `--everything` already produces; the SV VCF is annotated without plugins. Read them
+out with `bcftools +split-vep`.
 
 | Field                                                   | Source                 | Appears on                                              |
 | ------------------------------------------------------- | ---------------------- | ------------------------------------------------------- |
@@ -486,7 +485,7 @@ field rather than a match value.
 
 ### `signatures`
 
-Mutational signature analysis of the PASS SNVs and indels in the phased somatic VCF: [SigProfilerMatrixGenerator](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator) builds the mutational matrices and [SigProfilerAssignment](https://github.com/SigProfilerSuite/SigProfilerAssignment) fits COSMIC reference signatures to them. For `--genome CHM13` the matrices use the `CHM13-T2T` genome and the SBS/DBS fits use COSMIC signatures renormalised to CHM13; ID83 signatures are not genome-normalised by COSMIC and always use the GRCh37 set. The `DBS78` and `ID83` directories are absent when a sample has no doublet substitutions or indels.
+Mutational signature analysis of the PASS SNVs and indels in the phased somatic VCF: [SigProfilerMatrixGenerator](https://github.com/SigProfilerSuite/SigProfilerMatrixGenerator) builds the mutational matrices and [SigProfilerAssignment](https://github.com/SigProfilerSuite/SigProfilerAssignment) fits COSMIC reference signatures to them. The `DBS78` and `ID83` directories are absent when a sample has no doublet substitutions or indels. See [Mutational Signature Options](usage.md#mutational-signature-options) for the CHM13 handling.
 
 <details markdown="1">
 <summary>Output files</summary>
@@ -653,15 +652,15 @@ This is the final step of the pipeline, run after SNV/SV calling, ASCAT, WAKHAN 
 
 Sections:
 
-- **Small variants** — the VEP-annotated somatic SNVs/indels, with VAF, depth and phase set taken from the phased somatic VCF that VEP annotated. A footnote under the table names the file those VAF columns came from and how many rows they joined to; after a consensus run it also flags that the VAF of a multi-caller variant comes from whichever caller won the merge, so it need not match the `callers` column beside it. Unfiltered by default; see `--report_gene_panel` in [usage](usage.md#report-options) for panel filtering.
-  The pathogenicity predictors are read from the [plugin fields in `CSQ`](#plugin-fields-in-the-csq-annotation): SIFT, PolyPhen, AlphaMissense, ClinVar (linked to the ClinVar record), CADD, REVEL and EVE. Each predictor's class and score are separate columns, so the class gets a tickbox filter and the score sorts numerically, and pathogenic-class calls are tinted. A column appears only when the annotated VCF declared that field, so a plugin that was not on gives no column rather than an empty one — on CHM13 that means no `cosmic` or `dbsnp`, whose data the T2T cache does not carry, while SIFT and PolyPhen come from the `PolyPhen_SIFT` plugin instead of the cache. An **Annotation sources** footnote under the table names which sources were present and which were not.
+- **Small variants** — the VEP-annotated somatic SNVs/indels, with VAF, depth and phase set from the phased somatic VCF; a footnote names the file those columns came from and, after a consensus run, notes that a multi-caller variant's VAF comes from whichever caller won the merge. Unfiltered by default; see `--report_gene_panel` in [usage](usage.md#report-options).
+  - Pathogenicity predictors (SIFT, PolyPhen, AlphaMissense, ClinVar, CADD, REVEL, EVE) are read from the [plugin fields in `CSQ`](#plugin-fields-in-the-csq-annotation), each as a class column with a tickbox filter and a numeric score column. A column appears only when the annotated VCF declared that field, and an **Annotation sources** footnote lists which sources were present.
 - **Structural variants** — SEVERUS breakpoints, annotated from the VEP SV VCF (`{sample}_SV_VEP.vcf.gz`), one row per rearrangement. Breakends additionally get their own circos plot, cross-linked to the SV table and redrawn as the table is filtered. Skipping VEP leaves the SV table unannotated but still drawn on the circos plot.
 - **Copy number** — ASCAT purity/ploidy plus its diagnostic plots, and, when WAKHAN ran, its ranked purity/ploidy solutions with the interactive per-solution genome copy-number/breakpoint plots and the ploidy/purity heatmap.
 - **QC** — mosdepth, cramino and samtools statistics; for a matched tumour/normal pair both sides are shown side by side. Phasing statistics (WhatsHap) are a collapsible block within this section.
 
 Filtering in the browser:
 
-- **Gene panels** are checkboxes in the panel bar. Tick any number and a row is kept if it hits any of them (a union); with none ticked the tables are unfiltered. `--report_gene_panel` only sets which are ticked on load — see [usage](usage.md#applying-several-panels-at-once). With two or more ticked, each `panel_hit` entry names the panel it matched in square brackets.
+- **Gene panels** are checkboxes in the panel bar; ticked panels are unioned, and `--report_gene_panel` only sets which are ticked on load — see [usage](usage.md#applying-several-panels-at-once). With two or more ticked, each `panel_hit` entry names the panel it matched in square brackets.
 - **Categorical columns** filter by tickbox dropdown rather than a text box: `consequence`, `impact` and `callers` on the small-variant table, and `svclass`, `svtype`, `impact`, `consequence` and `caller` on the SV table. Each dropdown lists the values actually present in that sample with a row count. Ticking several values in one column is OR; ticking values in two columns is AND. A column with fewer than two distinct values keeps a plain text box. Every other column keeps its text box, and the table's own search box still does substring across all columns.
 
 The report is one self-contained file — plots and tables are embedded, so it can be copied or emailed on its own.

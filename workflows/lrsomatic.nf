@@ -175,33 +175,26 @@ workflow LRSOMATIC {
     channel
         .of( tuple(pon_files, pon_flags) )
         .set { clairsto_pon_channel }
-    // clairsto_pon_channel: [ [pon_vcf_path, ...], [is_population_allele_flag, ...] ]
-    //   -- single tuple of parallel lists; each flag indicates whether the corresponding VCF
-    //      is a population allele database (True) vs. a panel-of-normals artefact file (False)
+    // clairsto_pon_channel: [ [pon_vcf_path, ...], [is_population_allele_flag, ...] ]  -- flag: population database (true) or PoN artefact file (false)
 
-    // Verdict resolves its ASCAT loci/allele/GC set from --cna_resource_dir. The image ships the
-    // GRCh38 set, so resources are only needed for another assembly.
-    //
-    // Only ClairS-TO's own Verdict estimate reads them. With ASCAT in the run, CLAIRSTO is called
-    // with --disable_verdict and CLAIRSTO_VERDICT_TAG tags from ASCAT's tables instead, so the
-    // resources are neither built nor passed.
+    // Verdict's loci/allele/GC set (--cna_resource_dir): the image ships GRCh38, so only another assembly needs one,
+    // and only with --skip_ascat, since otherwise CLAIRSTO_VERDICT_TAG tags from ASCAT's tables instead.
     clairsto_cna_dir = params.skip_ascat && params.clairsto_cna_resources
         ? validateClairstoCnaResources(params.clairsto_cna_resources)
         : null
     if (params.clairsto_cna_resources && !params.skip_ascat) {
-        log.warn("--clairsto_cna_resources is ignored without --skip_ascat: Verdict's germline tagging comes from ASCAT's purity and copy number, not from ClairS-TO's own estimate of them.")
+        log.warn("--clairsto_cna_resources is ignored without --skip_ascat: Verdict's germline tagging then comes from ASCAT's purity and copy number.")
     }
     // CHM13 has no ascat_loci_rt attribute, so the built set is GC-only by construction
     build_clairsto_cna = clairsto_cna_dir == null && params.genome == 'CHM13' && params.skip_ascat
 
-    // An absent loci or allele set would leave the join below waiting forever and CLAIRSTO would
-    // silently never run, taking every tumour-only output with it
+    // A missing set would leave the join below waiting forever, so CLAIRSTO would silently never run
     if (build_clairsto_cna) {
         def missing_ascat = ['ascat_alleles': params.ascat_allele_files,
                              'ascat_loci': params.ascat_loci_files,
                              'ascat_loci_gc': params.ascat_gc_file].findAll { _attr, value -> !value }.keySet()
         if (missing_ascat) {
-            error("ClairS-TO's Verdict module needs the ASCAT loci, allele and GC content files for ${params.genome}, but ${missing_ascat.join(', ')} ${missing_ascat.size() == 1 ? 'is' : 'are'} not set. Add ${missing_ascat.size() == 1 ? 'it' : 'them'} to the genome config, or pass a prepared directory with --clairsto_cna_resources.")
+            error("ClairS-TO's Verdict module needs ${missing_ascat.join(', ')} for ${params.genome}: set them in the genome config, or pass a prepared directory with --clairsto_cna_resources.")
         }
     }
 
@@ -217,12 +210,9 @@ workflow LRSOMATIC {
                 getGenomeAttribute('asap')
               ]
             : []
-    // DeepSomatic requires no chromosome overlap across population VCFs; several databases are
-    // merged inline inside DEEPSOMATIC_MAKEEXAMPLES/POSTPROCESSVARIANTS so callers start in parallel.
+    // Several population VCFs are merged inside DEEPSOMATIC_MAKEEXAMPLES/POSTPROCESSVARIANTS (DeepSomatic allows no chromosome overlap)
     channel.value( [[:], ds_pon_files] ).set { ds_pon_channel }
-    // ds_pon_channel: [[:], [vcf_path, ...]] or [[:], []]
-    //   -- raw unmerged PON VCF paths (no .tbi required); merging happens inline in each DeepSomatic process
-    //   -- GRCh38/other + no user PON: empty list => process uses container-bundled GRCh38 defaults (tumor-only)
+    // ds_pon_channel: [[:], [vcf_path, ...]] or [[:], []]  -- unmerged PON VCFs; [] uses the container's GRCh38 defaults (tumor-only)
 
     ch_versions = channel.empty()
     ch_multiqc_files = channel.empty()
@@ -268,9 +258,7 @@ workflow LRSOMATIC {
     //   bams are grouped per sample (multiple runs merged into a list)
 
     //
-    // SUBWORKFLOW: PREPARE_REFERENCE_FILES
-    // Decompresses the reference FASTA if needed, indexes it, downloads Clair3 models,
-    // and decompresses ASCAT reference files
+    // SUBWORKFLOW: PREPARE_REFERENCE_FILES -- decompress and index the FASTA, fetch Clair3 models, unpack ASCAT references
     // Input:  params.fasta, ASCAT file paths, basecall_meta, clair3_modelMap
     // Output: .prepped_fasta           -- [[:], fasta]
     //         .prepped_fai             -- [[:], fai]
@@ -294,8 +282,7 @@ workflow LRSOMATIC {
     // Lays the ASCAT loci/allele/GC set out as the directory Verdict expects
     //
     if (build_clairsto_cna) {
-        // Each emits one list of paths: merge()/combine() would flatten the three into a single
-        // run of files, so key them on a shared meta and join.
+        // Each emits one list of paths; merge()/combine() would flatten them, so key on a shared meta and join
         cna_key = [ id: params.genome ]
         CLAIRSTO_CNA_RESOURCES(
             PREPARE_REFERENCE_FILES.out.loci_files.map { files -> [ cna_key, files ] }
@@ -342,8 +329,7 @@ workflow LRSOMATIC {
 
     }
 
-    // Each replicate is aligned separately so minimap2 can tag its reads with a unique @RG, then
-    // merged. ch_ubams defaults to ch_samplesheet; the fiber-seq block below may override it.
+    // Replicates are aligned separately (unique @RG each) and merged after; the fiber-seq block below may override ch_ubams
     ch_ubams = ch_samplesheet
 
     vep_cache = channel.empty()
@@ -384,8 +370,7 @@ workflow LRSOMATIC {
     // predict m6a in unaligned bam
 
     if (!params.skip_fiber) {
-        // Fiber-seq processing runs per-replicate on the unaligned BAMs.
-        // Each replicate is processed independently; replicates are merged after alignment.
+        // Fiber-seq runs per replicate on the unaligned BAMs; replicates are merged after alignment
         if (!params.skip_normalfiber){
             // Process all samples (including normals) for fiber-seq
             ubams = ch_samplesheet
@@ -511,9 +496,7 @@ workflow LRSOMATIC {
         }
     }
     //
-    // MODULE: MINIMAP2_ALIGN (label: process_high)
-    // Runs once per replicate.  The @RG header line encodes sample, type, and replicate so
-    // that reads remain distinguishable after the per-replicate BAMs are merged below.
+    // MODULE: MINIMAP2_ALIGN (label: process_high) -- once per replicate; @RG encodes sample, type and replicate
     // Input:  [meta_with_replicate, bam]  -- unaligned BAM per replicate
     //         ch_fasta     -- [[:], fasta]
     //         sort_bam=true, cigar_paf_format='bai', cigar_bam='', split_prefix=''
@@ -530,8 +513,7 @@ workflow LRSOMATIC {
         ""
     )
 
-    // Join per-replicate BAM with its index, drop the replicate field, then group replicates
-    // belonging to the same sample.  Single-replicate samples skip SAMTOOLS_MERGE.
+    // Join BAM with index, drop the replicate field, group per sample; single-replicate samples skip SAMTOOLS_MERGE
     MINIMAP2_ALIGN.out.bam
         .join(MINIMAP2_ALIGN.out.index)
         .map { meta, bam, bai ->
@@ -546,9 +528,7 @@ workflow LRSOMATIC {
                             'clairSTO_model',
                             'kinetics',
                             'n_replicates')
-            // groupKey tells groupTuple() how many items to expect for this group,
-            // allowing it to release each sample as soon as all its replicates arrive
-            // rather than waiting for all samples globally.
+            // groupKey: release each sample as soon as its own replicates arrive, not when all samples have
             return [groupKey(new_meta, new_meta.n_replicates), bam, bai]
         }
         .groupTuple()
@@ -569,9 +549,7 @@ workflow LRSOMATIC {
         .set { ch_single_indexed }
 
     //
-    // MODULE: SAMTOOLS_MERGE (label: process_low)
-    // Merges per-replicate coordinate-sorted BAMs.  Because each was aligned with a unique
-    // @RG line (ID = {sample}_{type}_rep{N}), the merged BAM retains full replicate identity.
+    // MODULE: SAMTOOLS_MERGE (label: process_low) -- replicate identity survives via the unique @RG lines
     // Input:  [meta, [bam...], [bai...]]  -- grouped replicate BAMs + indices
     // Output: .bam -- [meta, bam]  -- merged BAM
     //
@@ -605,8 +583,7 @@ workflow LRSOMATIC {
         }
         .set { branched_minimap }
 
-    // branched_minimap.paired:     [meta, bam, bai]  -- tumor AND normal samples flow together here;
-    //                                                    each item is a single sample, joined downstream
+    // branched_minimap.paired:     [meta, bam, bai]  -- tumor and normal samples, one item each, joined downstream
     // branched_minimap.tumor_only: [meta, bam, bai]  -- tumor-only samples (no matched normal)
 
     branched_minimap.paired
@@ -639,8 +616,7 @@ workflow LRSOMATIC {
         .set{paired_normal_bams}
     // paired_normal_bams: [meta (no type), normal_bam, normal_bai]
 
-    // Join tumor and normal BAMs into a single channel for somatic variant calling
-    // Join key is meta (with 'type' stripped), so tumor meta.id must equal normal meta.id
+    // Join tumor and normal BAMs on meta (type stripped) for somatic calling
     branched_paired_ch.tumor
         .map{ meta, bam, bai ->
             def new_meta = meta.subMap('id',
@@ -659,9 +635,7 @@ workflow LRSOMATIC {
     // somatic_smallvar_input: [meta, tumor_bam, tumor_bai, normal_bam, normal_bai]
 
     //
-    // MODULE: ASCAT (label: process_high)
-    // Runs before small variant calling: the tumor-only germline tagging (CLAIRSTO_VERDICT_TAG)
-    // takes ASCAT's purity and segments, and ASCAT itself needs only the BAMs.
+    // MODULE: ASCAT (label: process_high) -- runs before small variant calling; CLAIRSTO_VERDICT_TAG needs its output
     // Input:  [meta, normal_bam, normal_bai, tumor_bam, tumor_bai]  -- NOTE: normal before tumor (ASCAT convention)
     //         normal_bam/bai are [] for tumor-only samples
     //         allele_files, loci_files, gc_file, rt_file  -- ASCAT reference files
@@ -716,8 +690,7 @@ workflow LRSOMATIC {
             .set { ascat_tumoronly_ch }
         // ascat_tumoronly_ch: [meta, purityploidy, segments]
 
-        // Collect all ASCAT copy-number files (segments_raw, purityploidy, diagnostic PNGs) per sample
-        // for the final report module -- it globs by suffix, so exact grouping doesn't matter.
+        // All ASCAT files per sample for the report module, which globs by suffix
         ch_ascat_files = ASCAT.out.segments_raw
             .mix(ASCAT.out.purityploidy, ASCAT.out.png)
             .groupTuple()
@@ -909,9 +882,7 @@ workflow LRSOMATIC {
 
     if (!params.skip_signatures) {
 
-        // SUBWORKFLOW: PREPARE_SIGNATURES
-        // Validates (--sigprofiler_genome_dir) or installs (--download_sigprofiler_genome) the
-        // SigProfilerMatrixGenerator genome payload, tsb/<sigprofiler_genome>/
+        // SUBWORKFLOW: PREPARE_SIGNATURES -- validates or installs the SigProfilerMatrixGenerator payload, tsb/<sigprofiler_genome>/
         // Output: .volume -- path to the SigProfilerMatrixGenerator volume directory
         PREPARE_SIGNATURES (
             params.sigprofiler_genome,
@@ -924,9 +895,7 @@ workflow LRSOMATIC {
         // sigprofiler_volume: [[:], volume_dir]  -- empty meta + SigProfilerMatrixGenerator volume
 
         //
-        // MODULE: SIGNATURES_BCFTOOLS_VIEW (BCFTOOLS_VIEW alias; label: process_medium)
-        // SigProfilerMatrixGenerator ignores FILTER and needs a plain-text VCF, so keep only the
-        // PASS SNVs / MNVs / indels of the phased somatic VCF as uncompressed VCF
+        // MODULE: SIGNATURES_BCFTOOLS_VIEW (BCFTOOLS_VIEW alias; label: process_medium) -- PASS calls only, as plain VCF
         // Input:  PHASING_HAPLOTYPING.out.phased_somatic_vcf -- [meta, vcf, tbi]
         // Output: .vcf -- [meta, vcf]
         //
@@ -957,9 +926,7 @@ workflow LRSOMATIC {
         // sigprofiler_matrices: [meta, sbs96, dbs78 | [], id83 | []]
 
         //
-        // MODULE: SIGPROFILER_ASSIGNMENT (label: process_low)
-        // Fits COSMIC reference signatures to each matrix; SBS/DBS signatures are specific to
-        // the genome build (GRCh38 or CHM13-T2T), ID signatures use the GRCh37 set upstream
+        // MODULE: SIGPROFILER_ASSIGNMENT (label: process_low) -- fits COSMIC signatures (SBS/DBS per build, ID from GRCh37)
         // Output: per-sample Assignment_Solution directories with activities, statistics and plots
         //
         SIGPROFILER_ASSIGNMENT (
@@ -969,8 +936,7 @@ workflow LRSOMATIC {
         )
     }
 
-    // Build SEVERUS input by combining tumor-only and T/N paired samples with phased germline VCFs
-    // Tumor-only samples get empty lists for normal BAM/BAI (SEVERUS runs in tumor-only mode)
+    // SEVERUS input: tumor-only and paired samples with their phased germline VCF; [] normal BAM/BAI = tumor-only mode
     branched_minimap.tumor_only
         .map{ meta, bam, bai ->
             def new_meta = meta.subMap('id',
@@ -1134,8 +1100,7 @@ workflow LRSOMATIC {
     }
 
     //
-    // MODULE: WAKHAN (label: process_medium)
-    // Haplotype-aware genome assembly and variant phasing visualisation
+    // MODULE: WAKHAN (label: process_medium) -- haplotype-aware copy number
     // Input:  [meta, tumor_bam, tumor_bai, normal_bam, normal_bai, phased_germline_vcf, severus_all_vcf]
     //         ch_fasta          -- [[:], fasta]
     //         centromere_bed    -- BED file of centromere coordinates (for assembly anchoring)
@@ -1162,8 +1127,7 @@ workflow LRSOMATIC {
             file(params.centromere_bed)
         )
 
-        // The subset of WAKHAN's outputs the report renders: the ranked purity/ploidy
-        // solutions, the ploidy/purity heatmap and each solution's plot directory
+        // The WAKHAN outputs the report renders: ranked solutions, heatmap, per-solution plots
         ch_wakhan_files = WAKHAN.out.solutions_ranks
             .mix(WAKHAN.out.heatmap_html, WAKHAN.out.solution_dirs)
             .groupTuple()
@@ -1172,12 +1136,12 @@ workflow LRSOMATIC {
     }
 
     //
-    // MODULE: LRSOMATICREPORT (final per-sample HTML report; every input is optional, so the joins use `remainder: true` keyed on the tumor sample id)
+    // MODULE: LRSOMATICREPORT -- per-sample HTML report; all inputs optional, so joins use remainder: true on the tumor id
     //
 
     if (!params.skip_report) {
 
-        // Report identity: the tumor sample's id, carrying the meta to attach to the module call
+        // Report identity: the tumor sample's id plus its meta
         severus_input
             .map { meta, _tumor_bam, _tumor_bai, _normal_bam, _normal_bai, _phased_vcf, _phased_tbi ->
                 return [meta.id, meta]
@@ -1209,7 +1173,7 @@ workflow LRSOMATIC {
             .map { meta, files -> [meta.id, files] }
             .set { report_wakhan_ch }
 
-        // Tumor-side QC: keyed by the sample's own id, which for tumor rows is already the report id
+        // Tumor-side QC, keyed by the sample id (= report id)
         ch_mosdepth_summary
             .mix(ch_mosdepth_global, ch_cramino_post_txt, ch_bam_stats, ch_bam_flagstat)
             .filter { meta, _f -> meta.type == 'tumor' }
@@ -1217,8 +1181,7 @@ workflow LRSOMATIC {
             .groupTuple()
             .set { report_qc_tumor_ch }
 
-        // Normal-side QC (matched mode only): both rows of a pair share meta.id, so this is
-        // already keyed by the report id
+        // Normal-side QC (matched mode): a pair shares meta.id, so already keyed by the report id
         ch_mosdepth_summary
             .mix(ch_mosdepth_global, ch_cramino_post_txt, ch_bam_stats, ch_bam_flagstat)
             .filter { meta, _f -> meta.type == 'normal' }
@@ -1250,10 +1213,8 @@ workflow LRSOMATIC {
                 ]
             }
             .set { report_input_ch }
-        // report_input_ch: [meta, vep_somatic, sv_vep, severus_vcf, somatic_vcf, ascat_files, qc_tumor_files, qc_normal_files, wakhan_files]
 
-        // Only panel files need staging, so they are bound into the container; builtin names
-        // reach the tool through ext.args alone -- see conf/modules.config
+        // Only panel files are staged; builtin names reach the tool through ext.args (conf/modules.config)
         def report_gene_panel_files = reportGenePanelTokens(params.report_gene_panel)
             .findAll { tok -> reportGenePanelIsFile(tok) }
             .collect { tok -> file(tok, checkIfExists: true) }
@@ -1266,8 +1227,7 @@ workflow LRSOMATIC {
     }
 
     //
-    // Collate software versions from ch_versions (YAML files) and channel.topic("versions")
-    // (tuples emitted directly by modules using the topic-channel pattern)
+    // Collate software versions from ch_versions (YAML files) and channel.topic("versions") (tuples)
     //
     def topic_versions = channel.topic("versions")
         .distinct()  // deduplicate identical version entries across samples
@@ -1302,7 +1262,6 @@ workflow LRSOMATIC {
 
     //
     // MODULE: MULTIQC (label: process_single)
-    // Aggregates QC reports from all modules into a single HTML report
     // Input:  [[id:'multiqc'], [qc_files...], [config_files...], [logo], [], []]
     // Output: .report -- [meta, html]  -- MultiQC HTML report
     //
@@ -1326,8 +1285,7 @@ workflow LRSOMATIC {
         )
     )
 
-    // Collect QC outputs from all optional modules
-    // .collect{it -> it[1]} extracts the file from [meta, file] tuples; ifEmpty([]) handles skipped modules
+    // QC outputs of the optional modules; ifEmpty([]) covers skipped ones
     ch_multiqc_files = ch_multiqc_files.mix(ch_bam_stats.collect{it -> it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(ch_bam_flagstat.collect{it -> it[1]}.ifEmpty([]))
     ch_multiqc_files = ch_multiqc_files.mix(ch_bam_idxstats.collect{it -> it[1]}.ifEmpty([]))

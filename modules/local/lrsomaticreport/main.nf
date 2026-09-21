@@ -2,29 +2,23 @@ process LRSOMATICREPORT {
     tag "$meta.id"
     label 'process_medium'
 
-    // Conda is not supported: the image carries the lrsomatic_report tool itself, not just its
-    // dependencies, so an environment.yml would install the R/Quarto stack without render_report.R
-    // (the guard in `script:` stops conda/mamba runs). Switch to a bioconda `lrsomatic-report`
-    // package once the recipe at github.com/ljwharbers/lrsomatic_report/tree/main/recipe is merged.
-    // Updating the tool is a tag bump here: tag upstream, let its container workflow build, edit these two lines.
+    // No conda: the image ships render_report.R itself, not just its dependencies (guard in `script:`).
+    // TODO: switch to bioconda `lrsomatic-report` once the recipe in ljwharbers/lrsomatic_report is merged. Version bump = these two tags.
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
         ? 'oras://ghcr.io/ljwharbers/lrsomatic-report-sif:1.6.0'
         : 'ghcr.io/ljwharbers/lrsomatic-report:1.6.0'}"
 
     input:
-    // Every path input is optional (`[]` when skipped); tumor/normal QC stage into separate dirs because a matched pair shares meta.id
+    // Every path input is optional (`[]` when skipped); tumor/normal QC stage apart because a pair shares meta.id
     tuple val(meta), path(vep_somatic), path(sv_vep), path(severus_vcf), path(somatic_vcf), path(ascat_files), path(qc_tumor_files, stageAs: 'qc_tumor/*'), path(qc_normal_files, stageAs: 'qc_normal/*'), path(wakhan_files, stageAs: 'wakhan/*')
-    // Builtin gene panel TSVs, owned by this pipeline rather than by the tool, so the panel set
-    // can change without a tool release; reaches the tool as --gene-lists-dir
+    // Builtin gene panel TSVs, owned by the pipeline; reach the tool as --gene-lists-dir
     path(gene_lists, stageAs: 'gene_lists')
-    // User-supplied gene panel TSVs (`[]` for builtins); the matching `--gene-panel gene_panels/<base>` args are built in conf/modules.config
+    // User-supplied gene panel TSVs (`[]` for builtins); the `--gene-panel` args are built in conf/modules.config
     path(gene_panels, stageAs: 'gene_panels/*')
 
     output:
     tuple val(meta), path("*_report.html"), emit: report
-    // `env -u R_HOME`: Apptainer forwards the host environment, and R prints
-    // "WARNING: ignoring environment value of R_HOME" on *stdout* when it is set, which would
-    // otherwise land in the captured version string. Docker does not forward it, so CI never sees this.
+    // `env -u R_HOME`: Apptainer forwards the host env, and R's R_HOME warning goes to stdout, polluting the version string
     tuple val("${task.process}"), val('lrsomatic_report'), eval('env -u R_HOME render_report.R --version'), topic: versions, emit: versions_lrsomaticreport
 
     when:
@@ -52,9 +46,7 @@ process LRSOMATICREPORT {
     """ : ''
 
     """
-    # Quarto/Deno write under \$HOME, \$TMPDIR and \$XDG_CACHE_HOME (preferred over \$HOME/.cache).
-    # Apptainer inherits the host environment, so a cache dir outside the bound work tree reads as
-    # read-only inside the container and the render dies; point all of them at the task directory.
+    # Quarto/Deno caches must live in the task dir: an inherited HOME/TMPDIR/XDG_CACHE_HOME is read-only inside the container
     export HOME=\$PWD
     export TMPDIR=\$PWD/tmp TMP=\$PWD/tmp TEMP=\$PWD/tmp XDG_CACHE_HOME=\$PWD/.cache
     mkdir -p "\$TMPDIR"
@@ -73,7 +65,7 @@ process LRSOMATICREPORT {
         for f in qc_normal/*; do ln -s "\$PWD/\$f" "sample_dir/qc/normal/\$(basename "\$f")"; done
     fi
 
-    # Wakhan is addressed by fixed path: sample_dir/wakhan must hold solutions_ranks.tsv, the heatmap and solution_<rank>/
+    # Wakhan is read from a fixed path: sample_dir/wakhan with solutions_ranks.tsv, the heatmap and solution_<rank>/
     if [ -d wakhan ]; then
         mkdir -p sample_dir/wakhan
         for f in wakhan/*; do ln -s "\$PWD/\$f" "sample_dir/wakhan/\$(basename "\$f")"; done

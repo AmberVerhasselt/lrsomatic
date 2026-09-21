@@ -23,15 +23,12 @@ process CLAIRSTO_CNA_RESOURCES {
     """
     mkdir -p cna_resources/loci_files cna_resources/allele_files
 
-    # Recursive: a set unzipped from an archive arrives as one directory holding the
-    # per-contig files, while one given as a plain path arrives as the files themselves.
-    # Real files either way -- only this directory is staged into CLAIRSTO, so links out of
-    # it would dangle.
+    # Recursive, real copies: an unzipped set arrives as a directory, a plain path as loose files,
+    # and links out of this directory would dangle inside CLAIRSTO
     find -L loci -type f -exec cp -L -t cna_resources/loci_files/ {} +
     find -L alleles -type f -exec cp -L -t cna_resources/allele_files/ {} +
 
-    # ClairS-TO takes exactly one GC_*.txt and errors on a second candidate. Fail here instead,
-    # where the message can name the files.
+    # ClairS-TO takes exactly one GC_*.txt; fail here, where the message can name the files
     n_gc=\$(find -L gc -type f | wc -l)
     if [ "\$n_gc" -ne 1 ]; then
         echo "ERROR: expected exactly one GC content file, found \$n_gc:" >&2
@@ -45,8 +42,7 @@ process CLAIRSTO_CNA_RESOURCES {
         *)        cp -L "\$gc_src" "cna_resources/GC_${prefix}.txt" ;;
     esac
 
-    # No RT_*.txt, deliberately: Verdict then corrects LogR for GC content only, which is what
-    # ClairS-TO recommends for CHM13.
+    # No RT_*.txt: GC-only LogR correction, as ClairS-TO recommends for CHM13
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

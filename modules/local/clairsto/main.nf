@@ -54,16 +54,13 @@ process CLAIRSTO {
         $cna_resource_dir \\
         $args
 
-    # 0.5.1 renames its outputs after --sample_name, but only while the prefixes still hold their
-    # defaults, so the explicit ones above are passed through untouched and these names are fixed.
+    # Explicit prefixes are left alone by 0.5.1's --sample_name renaming, so these names are fixed
     mv snv_out.vcf.gz snv.vcf.gz
     mv snv_out.vcf.gz.tbi snv.vcf.gz.tbi
     mv indel_out.vcf.gz indel.vcf.gz
     mv indel_out.vcf.gz.tbi indel.vcf.gz.tbi
 
-    # Verdict's own purity/ploidy and copy number, when it ran here rather than in
-    # CLAIRSTO_VERDICT_TAG. They are written inside ClairS-TO's work directory under the tool's
-    # default sample name, so lift them out under the same names that step publishes.
+    # Lift Verdict's own purity/CN tables out of ClairS-TO's work dir under the names CLAIRSTO_VERDICT_TAG publishes
     for table in Purity_Ploidy CNA; do
         src=\$(find . -path "*/cna_output/*_Tumor_\${table}.txt" -print -quit)
         if [ -n "\$src" ]; then
