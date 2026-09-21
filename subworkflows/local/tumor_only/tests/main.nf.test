@@ -10,10 +10,8 @@ nextflow_workflow {
     // "small" is what .github/workflows/nf-test.yml selects on for pull_request
     tag "small"
 
-    // Which of the two germline tagging paths runs is decided here, and the pipeline tests all set
-    // skip_ascat, so nothing else covers the ASCAT one. Run under -stub: no caller reads the files
-    // below, so the fixtures only have to exist, and what is under test is the wiring -- that the
-    // join pairs each sample's ClairS-TO calls with its own ASCAT tables before tagging.
+    // The only coverage of the ASCAT tagging path (pipeline tests all set skip_ascat). Run under
+    // -stub: what is tested is that the join pairs each sample's calls with its own ASCAT tables.
 
     test("ASCAT in the run - the calls are tagged from ASCAT's tables") {
 

@@ -116,9 +116,8 @@ jobs:
             fi
           fi
 
-      # continue-on-error keeps latest-everything from failing the job, so it never shows up in
-      # `needs.nf-test.result` downstream and CI stays green. Surface it via a PR comment instead;
-      # other NXF_VER failures already fail the job/CI directly, so no comment is needed for those.
+      # latest-everything is continue-on-error, so its failures never reach needs.*.result;
+      # surface them via a PR comment instead.
       - name: Prepare PR comment fragment
         if: ${{ always() && steps.run_nf_test.outcome == 'failure' && matrix.NXF_VER == 'latest-everything' }}
         run: |
@@ -167,8 +166,7 @@ jobs:
           path: pr-comment-fragments
           merge-multiple: true
 
-      # Build a comment for the shared pr-comment.yml poster to publish on the PR.
-      # Based on the fragments above (not needs.*.result) so non-blocking failures are still reported.
+      # Build the comment for the shared pr-comment.yml poster from the fragments above.
       - name: Prepare PR comment
         if: ${{ always() }}
         env:

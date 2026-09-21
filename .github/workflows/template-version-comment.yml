@@ -28,9 +28,7 @@ jobs:
           pip install nf-core
 
       - name: Build PR comment if template is outdated
-        # The fork-controlled version is passed via the environment and only ever
-        # used as quoted shell data (never interpolated into a command), so it
-        # cannot be used for script injection.
+        # Fork-controlled value: passed via env and only used as quoted shell data, so it cannot inject.
         env:
           PR_VERSION: ${{ steps.read_yml.outputs['nf_core_version'] }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
