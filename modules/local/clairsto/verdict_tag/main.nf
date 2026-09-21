@@ -2,15 +2,13 @@ process CLAIRSTO_VERDICT_TAG {
     tag "$meta.id"
     label 'process_low'
 
-    // ClairS-TO's own Verdict tagging step, run on ASCAT's purity and segments instead of the
-    // estimate Verdict makes for itself. Same fork image as CLAIRSTO.
+    // ClairS-TO's Verdict tagging step, run on ASCAT's purity and segments; same fork image as CLAIRSTO
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
         ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8'
         : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8'}"
 
     input:
-    // ClairS-TO's untagged VCFs (called with --disable_verdict) and ASCAT's tables for the same
-    // sample. The VCFs keep their names on output, so they are staged aside.
+    // Untagged ClairS-TO VCFs (--disable_verdict) and ASCAT's tables; the VCFs keep their names, so they are staged aside
     tuple val(meta), path(snv_vcf, stageAs: 'untagged/snv.vcf.gz'), path(indel_vcf, stageAs: 'untagged/indel.vcf.gz'), path(purityploidy), path(segments)
 
     output:
@@ -48,16 +46,13 @@ process CLAIRSTO_VERDICT_TAG {
                 --tumor_purity_ploidy_output_file ${prefix}_Tumor_Purity_Ploidy.txt \\
                 --tumor_cna_output_file ${prefix}_Tumor_CNA.txt
         fi
-        # bgzip and tabix run unchecked inside Verdict, so a compression failure would otherwise
-        # look exactly like "did not tag" and ship the untagged calls. Verdict's bgzip removes
-        # its input on success, so a leftover plain VCF is that failure.
+        # Verdict's bgzip/tabix run unchecked and bgzip removes its input on success, so a leftover plain VCF means compression failed
         if [ -e \${kind}.vcf ]; then
             echo "ERROR: Verdict tagged \${kind} but compressing \${kind}.vcf failed" >&2
             exit 1
         fi
 
-        # Verdict writes nothing when it does not tag (purity above 0.6, or no ASCAT solution).
-        # Pass the calls through unchanged then, as ClairS-TO does in that case.
+        # No tags (purity above 0.6, or no ASCAT solution): pass the calls through, as ClairS-TO does
         if [ ! -e \${kind}.vcf.gz ]; then
             cp untagged/\${kind}.vcf.gz \${kind}.vcf.gz
             tabix -f -p vcf \${kind}.vcf.gz

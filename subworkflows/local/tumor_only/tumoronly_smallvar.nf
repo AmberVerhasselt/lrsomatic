@@ -36,8 +36,7 @@ workflow TUMORONLY_SMALLVAR {
     deepvariant_ch = channel.empty()
     deepsomatic_ch = channel.empty()
 
-    // CLAIRS-TO: somatic AND germline calling from a tumor-only BAM, separated with a
-    // panel-of-normals. Runs if either somatic or germline clair calling is requested.
+    // CLAIRS-TO: somatic and germline calling from a tumor-only BAM, split with a panel of normals
 
     if(somatic_var_keep.contains('clair') || germline_var_keep.contains('clair')) {
         // Append model name and PoN info to build the full CLAIRSTO input
@@ -64,10 +63,8 @@ workflow TUMORONLY_SMALLVAR {
         )
 
         if (!params.skip_ascat) {
-            // CLAIRSTO ran with --disable_verdict (conf/modules.config) and its VCFs carry no
-            // Verdict tags. The tagging is redone here from ASCAT's purity and segments: the same
-            // ASCAT model, but R ASCAT's estimate rather than the one Verdict's port makes for
-            // itself. Joined on the sample id because ASCAT carries the stripped meta.
+            // CLAIRSTO ran with --disable_verdict, so tag here from R ASCAT's purity and segments instead of
+            // Verdict's own estimate. Joined on the sample id because ASCAT carries the stripped meta.
             CLAIRSTO.out.snv_vcf
                 .join(CLAIRSTO.out.indel_vcf)
                 .map { meta, snv_vcf, indel_vcf -> [meta.id, meta, snv_vcf, indel_vcf] }
@@ -199,8 +196,7 @@ workflow TUMORONLY_SMALLVAR {
             .set{germline_vcf}
     }
 
-    // DEEPSOMATIC: somatic variant calling in tumor-only mode (no matched normal)
-    // Normal BAM/BAI are passed as empty lists; DeepSomatic uses the model's internal normal baseline
+    // DEEPSOMATIC in tumor-only mode: normal BAM/BAI are empty lists
     if(somatic_var_keep.contains('deepsomatic')) {
         tumor_bams
             .map { meta, tumor_bam, tumor_bai ->
