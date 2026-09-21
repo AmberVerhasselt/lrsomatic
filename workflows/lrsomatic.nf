@@ -1219,6 +1219,7 @@ workflow LRSOMATIC {
                 vep_cache,
                 ch_fasta,
                 [],
+                '',
                 vep_custom,
                 vep_custom_tbi
             )
