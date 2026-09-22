@@ -4,8 +4,8 @@ process CLAIRSTO_VERDICT_TAG {
 
     // ClairS-TO's Verdict tagging step, run on ASCAT's purity and segments; same fork image as CLAIRSTO
     container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
-        ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8'
-        : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8'}"
+        ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8-cpu'
+        : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8-cpu'}"
 
     input:
     // Untagged ClairS-TO VCFs (--disable_verdict) and ASCAT's tables; the VCFs keep their names, so they are staged aside
