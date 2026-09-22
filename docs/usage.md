@@ -673,6 +673,45 @@ In some cases, you may wish to change the container or conda environment used by
 
 To use a different container from the default container or conda environment specified in a pipeline, please see the [updating tool versions](https://nf-co.re/docs/running/configuration/nextflow-for-your-system#update-tool-versions) section of the nf-core website.
 
+### Large container images under Singularity/Apptainer
+
+The ClairS-TO image (`ghcr.io/ljwharbers/clairs-to`, about 3.3 GB) is pulled as `docker://` under
+Singularity and Apptainer too, and converted to a SIF on the machine that launches the pipeline.
+The pipeline's other custom images are small prebuilt `oras://` SIFs. The exception exists because
+ghcr redirects every download to a signed URL that expires on the next quarter-hour boundary, and
+Apptainer fetches an `oras://` SIF as one stream it cannot resume: a 3.5 GB SIF then fails with
+`PROTOCOL_ERROR` whenever the pull starts late in that window. A `docker://` pull resumes a cut
+layer with a Range request and gets a fresh URL each time.
+
+What this means for a first run:
+
+- The conversion needs roughly 10 GB free in the Apptainer temporary directory (`APPTAINER_TMPDIR`,
+  or `NXF_TEMP` when Nextflow sets it) and the Apptainer cache, plus a few minutes of CPU.
+- On a slow link the pull plus conversion can exceed a site's `pullTimeout`. Raise it with `-c`:
+
+  ```groovy
+  singularity.pullTimeout = '2h' // apptainer.pullTimeout under -profile apptainer
+  ```
+
+- Pulling once into a shared cache saves every later run the download. The file name is the one
+  Nextflow derives from the image name:
+
+  ```bash
+  apptainer pull "$NXF_SINGULARITY_CACHEDIR/ghcr.io-ljwharbers-clairs-to-0.5.1-verdict-chm13-c0687e8-flat.img" \
+      docker://ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8-flat
+  ```
+
+  `NXF_SINGULARITY_LIBRARYDIR` is checked first and never written to, so a read-only shared
+  directory of prebuilt images works as well.
+
+If an `oras://` SIF does fail to pull (the largest is the report image at 0.8 GB), the SIF bytes
+are the registry blob, which ghcr serves with Range support. Download it resumably into the cache
+under the name Nextflow expects (`oras://ghcr.io/ljwharbers/<name>-sif:<tag>` becomes
+`ghcr.io-ljwharbers-<name>-sif-<tag>.img`) with `curl -C -`, re-requesting the anonymous token from
+`https://ghcr.io/token?scope=repository:ljwharbers/<name>-sif:pull` on each attempt, until the file
+reaches the layer size in the image manifest; then check its `sha256sum` against the layer digest
+and `chmod +x` it.
+
 ### Custom Tool Arguments
 
 A pipeline might not always support every possible argument or option of a particular tool used in pipeline. Fortunately, nf-core pipelines provide some freedom to users to insert additional parameters that the pipeline does not include by default.

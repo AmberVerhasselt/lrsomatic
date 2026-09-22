@@ -4,9 +4,12 @@ process CLAIRSTO {
 
     // Fork of ClairS-TO 0.5.1 that resolves Verdict's CNA resources from --cna_resource_dir
     // instead of hardcoded GRCh38 names. No conda build; revert once upstream carries it.
-    container "${(workflow.containerEngine == 'singularity' || workflow.containerEngine == 'apptainer') && !task.ext.singularity_pull_docker_container
-        ? 'oras://ghcr.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8-cpu'
-        : 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8-cpu'}"
+    // docker:// on purpose, also under Singularity/Apptainer. Apptainer fetches an oras:// SIF as one
+    // unresumable stream, and the signed blob URL ghcr redirects to expires on the next quarter-hour
+    // boundary, so a 3.5 GB SIF fails on any pull that starts late in that window. A docker:// pull
+    // goes through containers/image, which resumes a cut layer with a Range request; the SIF is
+    // built locally on first use.
+    container 'ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8-flat'
 
     input:
     tuple val(meta), path(tumor_bam), path(tumor_bai), val(model), path(pon_vcfs), val(pon_flags)
