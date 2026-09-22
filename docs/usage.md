@@ -675,39 +675,46 @@ To use a different container from the default container or conda environment spe
 
 ### Large container images under Singularity/Apptainer
 
-The ClairS-TO image (`ghcr.io/ljwharbers/clairs-to`, about 3.3 GB) is pulled as `docker://` under
-Singularity and Apptainer too, and converted to a SIF on the machine that launches the pipeline.
-The pipeline's other custom images are small prebuilt `oras://` SIFs. The exception exists because
-ghcr redirects every download to a signed URL that expires on the next quarter-hour boundary, and
-Apptainer fetches an `oras://` SIF as one stream it cannot resume: a 3.5 GB SIF then fails with
-`PROTOCOL_ERROR` whenever the pull starts late in that window. A `docker://` pull resumes a cut
-layer with a Range request and gets a fresh URL each time.
+The ClairS-TO image is the pipeline's largest custom image (about 3.3 GB as a SIF). Under
+Singularity and Apptainer it is pulled as a prebuilt SIF from Docker Hub,
+`oras://docker.io/ljwharbers/clairs-to-sif:<tag>`; every other engine runs
+`docker.io/ljwharbers/clairs-to:<tag>`. It lives on Docker Hub rather than on ghcr with the
+pipeline's other custom images because ghcr redirects each download to a signed URL that expires
+at the next 5-minute mark and cuts a stream that is still open then, and Apptainer cannot resume a
+cut download: the SIF failed with `PROTOCOL_ERROR` on any link slower than about 10 MB/s. Docker
+Hub's download URLs are valid for 50 minutes and are only checked when the request starts, so a
+slow pull completes.
 
-What this means for a first run:
+What this means in practice:
 
-- The conversion needs roughly 10 GB free in the Apptainer temporary directory (`APPTAINER_TMPDIR`,
-  or `NXF_TEMP` when Nextflow sets it) and the Apptainer cache, plus a few minutes of CPU.
-- On a slow link the pull plus conversion can exceed a site's `pullTimeout`. Raise it with `-c`:
+- On a slow link the pull can exceed a site's `pullTimeout` (Nextflow's default is 20 minutes).
+  Raise it with `-c`:
 
   ```groovy
   singularity.pullTimeout = '2h' // apptainer.pullTimeout under -profile apptainer
   ```
 
+- Docker Hub limits anonymous pulls per source IP address, which a cluster's shared outbound
+  address can exhaust. If pulls fail with `TOOMANYREQUESTS`, authenticate with a free Docker Hub
+  account by setting `APPTAINER_DOCKER_USERNAME` and `APPTAINER_DOCKER_PASSWORD`
+  (`SINGULARITY_DOCKER_USERNAME` / `SINGULARITY_DOCKER_PASSWORD` under Singularity) in the
+  launching shell, or with `apptainer remote login --username <user> oras://docker.io`.
 - Pulling once into a shared cache saves every later run the download. The file name is the one
   Nextflow derives from the image name:
 
   ```bash
-  apptainer pull "$NXF_SINGULARITY_CACHEDIR/ghcr.io-ljwharbers-clairs-to-0.5.1-verdict-chm13-c0687e8-flat.img" \
-      docker://ghcr.io/ljwharbers/clairs-to:0.5.1-verdict-chm13-c0687e8-flat
+  apptainer pull "$NXF_SINGULARITY_CACHEDIR/docker.io-ljwharbers-clairs-to-sif-0.5.1-verdict-chm13-c0687e8-flat.img" \
+      oras://docker.io/ljwharbers/clairs-to-sif:0.5.1-verdict-chm13-c0687e8-flat
   ```
 
   `NXF_SINGULARITY_LIBRARYDIR` is checked first and never written to, so a read-only shared
   directory of prebuilt images works as well.
 
-If an `oras://` SIF does fail to pull (the largest is the report image at 0.8 GB), the SIF bytes
-are the registry blob, which ghcr serves with Range support. Download it resumably into the cache
-under the name Nextflow expects (`oras://ghcr.io/ljwharbers/<name>-sif:<tag>` becomes
-`ghcr.io-ljwharbers-<name>-sif-<tag>.img`) with `curl -C -`, re-requesting the anonymous token from
+The other custom SIFs (modkit, SigProfiler and the report image, the largest at 0.8 GB) are still
+`oras://ghcr.io/ljwharbers/<name>-sif:<tag>` and can hit the same cut on a very slow link. If one
+does, the SIF bytes are the registry blob, which ghcr serves with Range support. Download it
+resumably into the cache under the name Nextflow expects (`ghcr.io-ljwharbers-<name>-sif-<tag>.img`)
+with `curl -C -`, re-requesting the anonymous token from
 `https://ghcr.io/token?scope=repository:ljwharbers/<name>-sif:pull` on each attempt, until the file
 reaches the layer size in the image manifest; then check its `sha256sum` against the layer digest
 and `chmod +x` it.
