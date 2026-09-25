@@ -4,6 +4,8 @@ nextflow_process {
     script "../main.nf"
     process "VEPPLUGIN_CLINVAR"
 
+    // "small" is what .github/workflows/nf-test.yml selects on for pull_request
+    tag "small"
     tag "modules"
     tag "modules_local"
     tag "vepplugin_clinvar"
@@ -19,7 +21,8 @@ nextflow_process {
                 input[0] = [
                     'https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/clinvar_20260829.vcf.gz',
                     'https://ftp.ncbi.nlm.nih.gov/pub/clinvar/vcf_GRCh38/archive_2.0/2026/clinvar_20260829.vcf.gz.tbi',
-                    'dffae274fd559ee764d1de44f36df2cf'
+                    'dffae274fd559ee764d1de44f36df2cf',
+                    null // NCBI publishes no checksum for its index
                 ]
                 """
             }

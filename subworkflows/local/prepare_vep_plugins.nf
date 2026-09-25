@@ -86,16 +86,16 @@ workflow PREPARE_VEP_PLUGINS {
 
     //
     // MODULE: VEPPLUGIN_CLINVAR (label: process_single)
-    // Input:  the ClinVar VCF and index URLs, and the MD5 pinning the release (or null)
+    // Input:  the ClinVar VCF and index URLs, and the MD5s pinning them (either may be null)
     // Output: .files -- the VCF and its index, under the VCF's own basename
-    // One download per run: a foreign file is re-checked on its host by every VEP task, and NCBI
-    // answers the burst a multi-sample run sends with 503
+    // One download per run: a foreign file is re-checked on its host by GERMLINE_VEP and SOMATIC_VEP
+    // for every sample, and NCBI answers the burst a multi-sample run sends with 503
     //
     if (prepare.containsKey('vep_clinvar')) {
         def clinvar = prepare['vep_clinvar']
 
         VEPPLUGIN_CLINVAR (
-            channel.value([ clinvar.vcf, clinvar.tbi, clinvar.md5 ])
+            channel.value([ clinvar.vcf, clinvar.tbi, clinvar.md5, clinvar.tbi_md5 ])
         )
 
         staged << VEPPLUGIN_CLINVAR.out.files

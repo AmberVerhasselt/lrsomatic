@@ -8,7 +8,7 @@ process VEPPLUGIN_CLINVAR {
         : 'community.wave.seqera.io/library/wget:1.21.4--8b0fcde81c17be5e'}"
 
     input:
-    tuple val(vcf_url), val(tbi_url), val(md5)
+    tuple val(vcf_url), val(tbi_url), val(md5), val(tbi_md5)
 
     output:
     path "${vcf_name}{,.tbi}", emit: files
@@ -22,13 +22,14 @@ process VEPPLUGIN_CLINVAR {
     script:
     def args = task.ext.args ?: ''
     vcf_name = vcf_url.toString().tokenize('/').last()
-    def check = md5 ? "echo '${md5}  ${vcf_name}' | md5sum -c -" : ''
+    def sums = [ md5 ? "${md5}  ${vcf_name}" : null, tbi_md5 ? "${tbi_md5}  ${vcf_name}.tbi" : null ].findAll()
+    def check = sums ? "printf '%s\\n' ${sums.collect { line -> "'${line}'" }.join(' ')} | md5sum -c -" : ''
     """
-    # NCBI answers bursts with 503, so retry those rather than fail on the first one
+    # Retry a transient 503 from NCBI: a linear backoff of 1 s, 2 s, ... up to 10 s, about 45 s over 10 tries
     wget \\
         --no-verbose \\
-        --tries=5 \\
-        --waitretry=30 \\
+        --tries=10 \\
+        --waitretry=10 \\
         --retry-on-http-error=429,500,502,503,504 \\
         ${args} \\
         -O ${vcf_name} \\
@@ -37,14 +38,14 @@ process VEPPLUGIN_CLINVAR {
     # Saved next to the VCF under the name VEP looks for, whatever the host calls it
     wget \\
         --no-verbose \\
-        --tries=5 \\
-        --waitretry=30 \\
+        --tries=10 \\
+        --waitretry=10 \\
         --retry-on-http-error=429,500,502,503,504 \\
         ${args} \\
         -O ${vcf_name}.tbi \\
         ${tbi_url}
 
-    # A pinned checksum keeps the release fixed: a host that re-publishes under the same name fails here
+    # Pinned checksums keep the release fixed: a host that re-publishes under the same name fails here
     ${check}
 
     cat <<-END_VERSIONS > versions.yml

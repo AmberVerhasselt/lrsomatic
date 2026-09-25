@@ -27,6 +27,11 @@ input:
         description: |
           Expected MD5 of the VCF. When set, a download that does not match fails
           the task. May be null, in which case the release is not verified.
+    - tbi_md5:
+        type: string
+        description: |
+          Expected MD5 of the index, checked the same way. May be null, as for
+          NCBI, which publishes no checksum for its indexes.
 
 output:
   files:
