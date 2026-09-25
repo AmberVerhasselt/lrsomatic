@@ -99,6 +99,7 @@ workflow PREPARE_VEP_PLUGINS {
         )
 
         staged << VEPPLUGIN_CLINVAR.out.files
+        ch_versions = ch_versions.mix(VEPPLUGIN_CLINVAR.out.versions)
     }
 
     // Value channel read by both VEP tasks; ifEmpty carries the no-plugins case, since collect() emits nothing then

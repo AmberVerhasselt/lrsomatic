@@ -12,7 +12,9 @@ process VEPPLUGIN_CLINVAR {
 
     output:
     path "${vcf_name}{,.tbi}", emit: files
-    tuple val("${task.process}"), val('wget'), eval("wget --version | head -1 | cut -d ' ' -f 3"), topic: versions, emit: versions_wget
+    // versions.yml rather than an eval() topic: eval outputs are numbered pipeline-wide, so adding
+    // one shifts the cache key of every other task that has one and breaks -resume of existing runs
+    path "versions.yml"      , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -44,6 +46,11 @@ process VEPPLUGIN_CLINVAR {
 
     # A pinned checksum keeps the release fixed: a host that re-publishes under the same name fails here
     ${check}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        wget: \$(wget --version | head -1 | cut -d ' ' -f 3)
+    END_VERSIONS
     """
 
     stub:
@@ -51,5 +58,10 @@ process VEPPLUGIN_CLINVAR {
     """
     echo "" | gzip > ${vcf_name}
     touch ${vcf_name}.tbi
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        wget: \$(wget --version | head -1 | cut -d ' ' -f 3)
+    END_VERSIONS
     """
 }

@@ -9,11 +9,7 @@
                     ]
                 ],
                 "1": [
-                    [
-                        "VEPPLUGIN_CLINVAR",
-                        "wget",
-                        "1.21.4"
-                    ]
+                    "versions.yml:md5,ca06b557f10c3af9a0e088e9a76b0580"
                 ],
                 "files": [
                     [
@@ -21,12 +17,8 @@
                         "clinvar_20260829.vcf.gz.tbi:md5,d41d8cd98f00b204e9800998ecf8427e"
                     ]
                 ],
-                "versions_wget": [
-                    [
-                        "VEPPLUGIN_CLINVAR",
-                        "wget",
-                        "1.21.4"
-                    ]
+                "versions": [
+                    "versions.yml:md5,ca06b557f10c3af9a0e088e9a76b0580"
                 ]
             }
         ],
@@ -34,6 +26,6 @@
             "nf-test": "0.9.3",
             "nextflow": "25.10.4"
         },
-        "timestamp": "2026-09-25T10:53:31.340624257"
+        "timestamp": "2026-09-25T11:40:31.870446909"
     }
 }

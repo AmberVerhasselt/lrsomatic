@@ -34,28 +34,11 @@ output:
         type: file
         description: The ClinVar VCF and its tabix index
         pattern: "*.vcf.gz{,.tbi}"
-  versions_wget:
-    - - ${task.process}:
-          type: string
-          description: The process the versions were collected from
-      - wget:
-          type: string
-          description: The tool name
-      - "wget --version | head -1 | cut -d ' ' -f 3":
-          type: string
-          description: The command used to generate the version of the tool
-
-topics:
   versions:
-    - - ${task.process}:
-          type: string
-          description: The process the versions were collected from
-      - wget:
-          type: string
-          description: The tool name
-      - "wget --version | head -1 | cut -d ' ' -f 3":
-          type: string
-          description: The command used to generate the version of the tool
+    - versions.yml:
+        type: file
+        description: File containing software versions
+        pattern: "versions.yml"
 
 authors:
   - "@AmberVerhasselt"
