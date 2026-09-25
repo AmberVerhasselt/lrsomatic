@@ -274,16 +274,16 @@ Present in **paired** (tumor + normal) samples.
 ├── clairs
 │   ├── indel.vcf.gz
 │   ├── indel.vcf.gz.tbi
-│   ├── snv.vcf.gz
-│   ├── snv.vcf.gz.tbi
+│   ├── snvs.vcf.gz
+│   ├── snvs.vcf.gz.tbi
 ```
 
 | File               | Description                       |
 | ------------------ | --------------------------------- |
 | `indel.vcf.gz`     | Somatic indel calls in vcf format |
 | `indel.vcf.gz.tbi` | Index for somatic indel calls     |
-| `snv.vcf.gz`       | Somatic SNV calls in vcf format   |
-| `snv.vcf.gz.tbi`   | Index for somatic SNV calls       |
+| `snvs.vcf.gz`      | Somatic SNV calls in vcf format   |
+| `snvs.vcf.gz.tbi`  | Index for somatic SNV calls       |
 
 #### `clairS-TO`
 
