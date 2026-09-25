@@ -409,6 +409,28 @@ def vepPluginNeedsPrep(data_param) {
 }
 
 //
+// Whether a resource is downloaded once by a prep task instead of staged as a foreign file
+//
+// Only a remote ClinVar is: a foreign file is re-checked on its host by every VEP task that takes
+// it, and NCBI answers the burst a multi-sample run sends with 503, which fails the staging.
+//
+def vepPluginNeedsFetch(data_param) {
+    def value = vepPluginResource(data_param)
+    return value &&
+        data_param == 'vep_clinvar' &&
+        value.toString().contains('://')
+}
+
+//
+// The expected MD5 of a fetched resource. Overriding the data file drops the default MD5,
+// which belongs to a different release
+//
+def vepPluginMd5(data_param) {
+    def md5_param = "${data_param}_md5".toString()
+    return params[md5_param] ?: (params[data_param] ? null : getGenomeAttribute(md5_param))
+}
+
+//
 // The filename a prep task writes, referenced by the VEP argument since plugins stage into the task root
 //
 def vepPluginPreparedName(data_param) {
@@ -474,6 +496,14 @@ def validateVepPluginParams() {
     if (params.vep_custom && !(params.vep_args =~ /--custom file=/)) {
         error("--vep_custom: needs a matching '--custom file=...' entry in --vep_args, which is where the staged file is substituted in. Add one, e.g. --vep_args '${params.vep_args} --custom file=placeholder,short_name=MyTrack,format=vcf,type=exact,coords=0'.")
     }
+
+    // The MD5 is checked by the download task, so a local ClinVar would silently skip it
+    if (params.vep_clinvar_md5 && !vepPluginNeedsFetch('vep_clinvar')) {
+        error("--vep_clinvar_md5: only checks a ClinVar the pipeline downloads, so it needs --vep_clinvar to be a URL. Drop --vep_clinvar_md5 for a local file.")
+    }
+    if (vepPluginNeedsFetch('vep_clinvar') && !vepPluginMd5('vep_clinvar')) {
+        log.warn("--vep_clinvar: '${vepPluginResource('vep_clinvar')}' is downloaded without --vep_clinvar_md5, so its release is not verified: a host that re-publishes under the same name, like the rolling clinvar.vcf.gz, changes the annotation between runs.")
+    }
 }
 
 //
@@ -494,8 +524,14 @@ def stageVepPluginFile(staged, data_param) {
 //
 // A resource needing prep is kept as its raw value rather than a file(), since neither the REVEL nor
 // the EVE host can be staged by Nextflow -- PREPARE_VEP_PLUGINS fetches those with WGET instead.
+// A remote ClinVar is recorded with its index and MD5, and keeps its own basename.
 //
 def registerVepPlugin(staged, prepare, data_param) {
+    if (vepPluginNeedsFetch(data_param)) {
+        def url = vepPluginResource(data_param).toString()
+        prepare[data_param] = [ vcf: url, tbi: vepPluginIndex(data_param), md5: vepPluginMd5(data_param) ]
+        return url.tokenize('/').last()
+    }
     if (vepPluginNeedsPrep(data_param)) {
         prepare[data_param] = vepPluginResource(data_param)
         return vepPluginPreparedName(data_param)
